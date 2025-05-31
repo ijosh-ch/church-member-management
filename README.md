@@ -9,10 +9,15 @@ Pemrograman adalah proses memberikan instruksi kepada komputer untuk menjalankan
 ### 1.2 Konsep Dasar Pemrograman
 
 - **Variabel**: Wadah untuk menyimpan nilai/data.
+
 - **Tipe Data**: Tipe umum seperti string, angka, boolean, array.
+
 - **Fungsi**: Blok kode untuk melakukan tugas tertentu.
+
 - **Percabangan**: Logika seperti `if`, `else` untuk pengambilan keputusan.
-- **Perulangan**: Mengulangi tugas dengan `for` dan `while`.
+
+- **Perulangan (Loop)**: Mengulangi tugas dengan `for` dan `while`.
+
 - **API**: Antarmuka untuk berkomunikasi dengan layanan lain.
 
 ### 1.3 Mengapa Belajar Pemrograman?
@@ -30,9 +35,13 @@ Proyek ini menunjukkan cara mengelola data anggota gereja menggunakan Google For
 Sistem ini akan:
 
 1. Mengumpulkan data anggota gereja lewat **Google Form**.
+
 2. Menggunakan **Google Apps Script** untuk:
+
    - Menambahkan ulang tahun anggota ke **Google Calendar**.
+
    - Membuat **dua kode QR** (Taipei & Zhongli).
+
    - Mengirim **email selamat datang** ke anggota beserta QR code.
 
 ---
@@ -52,14 +61,51 @@ flowchart TD
     G --> H((**Selesai**))
 ```
 
+```mermaid
+flowchart TD
+    A((Mulai)) --> B[Ambil data dari Google Spreadsheet]
+    B --> C{Apakah data sudah diproses?}
+    C -- Sudah --> H((Selesai))
+    C -- Belum --> D[Ambil Nama, Email, Tanggal Lahir]
+    D --> E[Format tanggal lahir (tanpa tahun jika perlu)]
+    E --> F[Periksa apakah event sudah ada di Google Calendar]
+    F -- Sudah --> H
+    F -- Belum --> G[Tambahkan event ulang tahun ke Google Calendar]
+    G --> H((Selesai))
+```
+
+Diagram di atas menjelaskan langkah-langkah detail proses penambahan ulang tahun ke Google Calendar menggunakan Google Apps Script:
+
+- Ambil data dari Google Spreadsheet.
+
+- Cek apakah data sudah diproses (misal, dengan kolom status atau pengecekan event di kalender).
+
+- Ambil nama, email, dan tanggal lahir.
+
+- Format tanggal lahir sesuai kebutuhan (misal, hanya bulan dan tanggal).
+
+- Cek apakah event ulang tahun sudah ada di Google Calendar.
+
+- Jika belum, tambahkan event baru.
+
+- Selesai.
+
 - Google Form digunakan untuk mengumpulkan:
+
   - Nama (Bahasa Inggris)
+
   - Email
+
   - Tanggal Lahir
+
 - Submisi direkam di Google Sheet.
+
 - Google Apps Script membaca data dari Sheet dan:
+
   - Menambahkan ulang tahun ke kalender.
+
   - Membuat QR code berdasarkan waktu submisi dan nama.
+
   - Mengirim email personal ke anggota.
 
 ---
@@ -69,8 +115,11 @@ flowchart TD
 #### Langkah 1: Buat Google Form
 
 - Form dengan kolom:
+
   - `Nama (Bahasa Inggris)`
+
   - `Email`
+
   - `Tanggal Lahir`
 
 #### Langkah 2: Hubungkan ke Google Sheet
@@ -86,6 +135,7 @@ Gunakan formula ini di Google Sheet untuk QR code:
 ```
 
 - Ganti URL form dan ID `entry` sesuai milik Anda.
+
 - Buat salinan untuk kolom QR Zhongli, ganti `Taipei` menjadi `Zhongli`.
 
 #### Langkah 4: Tambahkan Ulang Tahun ke Google Calendar (Apps Script)
@@ -141,7 +191,9 @@ Admin Gereja`;
 ### 2.4 Tips Otomatisasi
 
 - Gunakan `Trigger > On form submit` di Apps Script.
+
 - Gunakan kontrol versi script untuk debugging.
+
 - Coba kirim email ke diri sendiri terlebih dahulu sebagai tes.
 
 ---
