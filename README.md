@@ -188,18 +188,157 @@ Admin Gereja`;
 
 ---
 
-### 2.4 Tips Otomatisasi
+### 2.3 Configuration & Setup
 
-- Gunakan `Trigger > On form submit` di Apps Script.
+#### 2.3.1 Local Development with Clasp
 
-- Gunakan kontrol versi script untuk debugging.
+To enable local development and syncing with Google Apps Script:
 
-- Coba kirim email ke diri sendiri terlebih dahulu sebagai tes.
+1. **Install clasp globally:**
+   ```bash
+   npm install -g @google/clasp
+   ```
+
+2. **Login to your Google account:**
+   ```bash
+   clasp login
+   ```
+
+3. **Clone your existing Apps Script project:**
+   ```bash
+   clasp clone [SCRIPT_ID]
+   ```
+   (Find SCRIPT_ID in your Apps Script project URL)
+
+4. **Development workflow:**
+   ```bash
+   # Pull latest changes from cloud
+   clasp pull
+   
+   # Make your local changes
+   # ...
+   
+   # Push changes to cloud
+   clasp push
+   
+   # Open script in browser
+   clasp open
+   ```
+
+#### 2.3.2 Project Structure
+
+```
+/church-member-management
+├── appsscript.json          # Apps Script configuration
+├── Code.js                  # Legacy main script (if any)
+├── config.js                # Configuration file
+├── main.js                  # Main script logic
+├── utilities.js             # Utility functions
+└── test.js                  # Test functions
+```
+
+#### 2.3.3 Configuration Setup
+
+The `config.js` file uses **field titles** instead of hardcoded IDs for better maintainability:
+
+```javascript
+const CONFIG = {
+  // Form & Calendar IDs
+  REGISTRATION_FORM_ID: 'your-form-id',
+  BIRTHDAY_CALENDAR_ID: 'your-calendar-id',
+  
+  // Spreadsheet Configuration
+  SPREADSHEET: {
+    ID: 'your-spreadsheet-id',
+    SHEET: 'Sheet1' // or your sheet name
+  },
+  
+  // Form Field Titles (Match your form exactly)
+  FIELD_TITLES: {
+    ENGLISH_NAME: 'Full Name',        // Your form's name field title
+    CHINESE_NAME: 'Chinese Name',     // Your form's Chinese name field title
+    BIRTHDAY: 'Tanggal Lahir',        // Your form's birthday field title
+    ICARE: 'iCare',                   // Your form's iCare field title
+    EMAIL: 'Email',                   // Your form's email field title (if separate)
+    PHONE: 'WhatsApp Number'          // Your form's phone field title
+  },
+  
+  // Attendance Form Field Titles (For auto-detecting entry IDs)
+  ATTENDANCE_FORM_FIELDS: {
+    EMAIL: 'Email Jemaat Terdaftar',  // Attendance form email field title
+    PHONE: 'WhatsApp Number',         // Attendance form phone field title
+    FULL_NAME: 'Full Name',           // Attendance form name field title
+    ICARE: 'iCare',                   // Attendance form iCare field title
+    LOCATION: 'Lokasi'                // Attendance form location field title
+  },
+  
+  // Manual Entry ID Overrides (Optional - leave empty for auto-detection)
+  ENTRY_ID_EMAIL: '',               // Override auto-detection if needed
+  ENTRY_ID_PHONE: '',               // Override auto-detection if needed
+  ENTRY_ID_FULL_NAME: '',           // Override auto-detection if needed
+  ENTRY_ID_ICARE: '',               // Override auto-detection if needed
+  ENTRY_ID_LOCATION: ''             // Override auto-detection if needed
+};
+```
+
+#### 2.3.4 Dynamic Field Mapping
+
+The system now uses **dynamic field mapping** instead of hardcoded column indices:
+
+**Benefits:**
+- ✅ Works regardless of form field order
+- ✅ Automatically handles form structure changes
+- ✅ No need to manually update column indices
+
+**How it works:**
+1. **Email Field**: 
+   - If `QID_EMAIL` is 0 (default): Uses auto-collected respondent email (column 1)
+   - If `QID_EMAIL` is set: Uses that specific form field
+2. **Phone Field**: Uses `getColumnIndexForFieldId(CONFIG.QID_PHONE)` to find the correct column
+3. **Other Fields**: All mapped dynamically using their Question IDs
+
+**Finding and Verifying Fields:**
+```javascript
+// Run this function to see all registration form fields and verify configuration
+function logQuestionIDs() {
+  // Shows all fields with ✅ CONFIGURED or ❌ NOT FOUND status
+}
+
+// Run this function to see all attendance form fields and verify field matching
+function logAttendanceFormFields() {
+  // Shows all attendance form fields and which ones match your configuration
+}
+
+// Run this function to test entry ID auto-detection
+function testEntryIdDetection() {
+  // Shows auto-detected entry IDs and generates sample pre-filled URLs
+}
+
+// Run this function to check which fields are required
+function logFieldRequirements() {
+  // Shows requirement status - only required fields are checked for duplicates
+}
+```
+
+#### 2.3.5 New Features
+
+**1. Edit Response URL Tracking**
+- Automatically adds edit response URL to spreadsheet (column A)
+- Allows easy editing of member information later
+
+**2. Duplicate Prevention**
+
+- Checks for existing members by email or phone number
+- **Smart Field Checking**: Only enforces uniqueness for fields marked as "required" in the form
+- Prevents duplicate birthday events in calendar
+- Uses dynamic field mapping for reliable detection
+- Supports both auto-collected email and custom email fields
+
+**3. Error Handling**
+- Graceful handling of missing fields or configuration errors
+- Detailed logging for troubleshooting
+- Admin email notifications for critical errors
 
 ---
 
-## Penutup
-
-Panduan ini membantu pemula memahami dasar pemrograman dan membangun proyek nyata untuk manajemen anggota gereja menggunakan Google Apps Script. Cocok untuk komunitas atau pelayanan gereja yang ingin mengelola data secara efisien.
-
----
+### 2.4 Implementasi Kode
