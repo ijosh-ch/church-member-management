@@ -66,8 +66,29 @@ function onFormSubmit(e) {
 
 // --- 3. CORE PROCESS FUNCTIONS ---
 
-// Calendar functionality moved to calendar.js
-// The addBirthdayToCalendar function is now available from calendar.js
+/**
+ * Creates a recurring annual birthday event on the specified calendar.
+ * @param {object} member The member details object.
+ */
+function addBirthdayToCalendar(member) {
+  try {
+    const calendar = CalendarApp.getCalendarById(CONFIG.BIRTHDAY_CALENDAR_ID);
+    if (!calendar) throw new Error(`Calendar with ID '${CONFIG.BIRTHDAY_CALENDAR_ID}' not found.`);
+
+    const recurrence = CalendarApp.newRecurrence().addYearlyRule().until(new Date(member.birthday.getFullYear() + 99, member.birthday.getMonth(), member.birthday.getDate()));
+    const eventTitle = `🎂 ${member.englishName} (${member.chineseName})'s Birthday`;
+    const eventDescription = `English Name: ${member.englishName}\nChinese Name: ${member.chineseName}\nYear of Birth: ${member.birthday.getFullYear()}`;
+
+    const eventSeries = calendar.createAllDayEventSeries(eventTitle, member.birthday, recurrence, { description: eventDescription });
+    eventSeries.addPopupReminder(10080); // 1 week
+    eventSeries.addPopupReminder(1440);  // 1 day
+
+    Logger.log(`✅ Added birthday event for ${member.englishName}.`);
+  } catch (error) {
+    Logger.log(`⚠️  Could not add birthday to calendar: ${error.message}`);
+    // Does not throw error to allow rest of script to run.
+  }
+}
 
 /**
  * Generates two location-specific QR code image blobs for a member.
