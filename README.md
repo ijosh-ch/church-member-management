@@ -1,6 +1,6 @@
 # Church Member Management System Tutorial
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Google Apps Script](https://img.shields.io/badge/Google%20Apps%20Script-4285F4?logo=google&logoColor=white)](https://script.google.com/)
 [![Made with ❤️](https://img.shields.io/badge/Made%20with-❤️-red.svg)](https://github.com/yourusername/church-member-management)
 
@@ -9,17 +9,19 @@ A comprehensive tutorial and implementation guide for building an automated chur
 ## 📚 Table of Contents
 
 - [Overview](#overview)
-- [Features](#features)
-- [Prerequisites](#prerequisites)
-- [Quick Start](#quick-start)
-- [Tutorial](#tutorial)
-- [API Documentation](#api-documentation)
-- [Configuration](#configuration)
-- [Deployment](#deployment)
-- [Troubleshooting](#troubleshooting)
-- [Contributing](#contributing)
+- [Features](#-features)
+- [Recent Updates (July 2025)](#-recent-updates-july-2025)
+- [Prerequisites](#-prerequisites)
+- [Quick Start](#-quick-start)
+- [Tutorial](#-tutorial)
+- [API Documentation](#-api-documentation)
+- [Configuration](#️-configuration)
+- [Deployment](#-deployment)
+- [Troubleshooting](#-troubleshooting)
+- [Contributing](#-contributing)
+- [License](#-license)
 
-## 🎯 Overview
+## Overview
 
 This project demonstrates how to build a complete church member management system that:
 
@@ -45,6 +47,7 @@ graph TB
 ## ✨ Features
 
 ### Core Features
+
 - ✅ **Dynamic Form Processing** - Handles form structure changes automatically
 - ✅ **Smart Duplicate Detection** - Prevents duplicate member registrations
 - ✅ **Birthday Calendar Integration** - Automatic birthday event creation
@@ -53,28 +56,49 @@ graph TB
 - ✅ **Error Handling** - Comprehensive error logging and recovery
 
 ### Advanced Features
+
 - ✅ **Field Mapping** - Dynamic field detection and mapping
 - ✅ **Multi-location Support** - Support for multiple church locations
 - ✅ **Edit Response Tracking** - Easy member information updates
 - ✅ **Admin Notifications** - Critical error notifications to administrators
 - ✅ **Development Tools** - Local development with clasp integration
 
+## 🔄 Recent Updates (July 2025)
+
+### ⚡ Calendar Module Refactoring
+
+- **🗂️ Modular Architecture**: Separated birthday logic into dedicated `development/calendar.js` module
+- **🔗 Combined Functions**: Merged `formatBirthdayEventTitle` and `formatBirthdayEventDescription` into single `formatBirthdayEvent()` function
+- **🧹 Code Cleanup**: Removed unnecessary utility functions, reduced calendar.js from 487 to 148 lines (69% reduction)
+- **📊 Spreadsheet-First**: Duplicate checking now handled via spreadsheet rather than calendar events
+- **⚡ Performance**: Streamlined birthday creation workflow with better error handling
+
+### 🛠️ Technical Improvements
+
+- **📚 Enhanced Documentation**: Updated API documentation with current function signatures
+- **🔧 Better Configuration**: Cleaner config structure with field-based mapping
+- **🧪 Focused Testing**: Simplified test functions for essential features only
+- **📁 File Organization**: Clear separation between production and development versions
+
 ## 📋 Prerequisites
 
 Before starting this tutorial, you should have:
 
 ### Required Knowledge
+
 - Basic JavaScript understanding
 - Familiarity with Google Workspace (Forms, Sheets, Drive)
 - Basic understanding of APIs and web services
 
 ### Required Tools
+
 - Google account with Google Workspace access
 - Code editor (VS Code recommended)
 - Node.js (for local development)
 - Git (for version control)
 
 ### Optional but Recommended
+
 - Basic understanding of:
   - **Variables**: Data containers (`const name = "John"`)
   - **Functions**: Reusable code blocks
@@ -88,6 +112,7 @@ Before starting this tutorial, you should have:
 ## 🚀 Quick Start
 
 ### 1. Clone and Setup
+
 ```bash
 git clone https://github.com/yourusername/church-member-management.git
 cd church-member-management
@@ -96,12 +121,15 @@ clasp login
 ```
 
 ### 2. Configure Your Project
+
 1. Copy your Google Apps Script project ID
 2. Update `config.js` with your form and calendar IDs
 3. Deploy using `clasp push`
 
 ### 3. Test the System
+
 Run the test functions to verify everything works:
+
 ```javascript
 // In Google Apps Script editor
 logQuestionIDs();        // Verify form field mapping
@@ -251,22 +279,27 @@ Admin Gereja`;
 To enable local development and syncing with Google Apps Script:
 
 1. **Install clasp globally:**
+
    ```bash
    npm install -g @google/clasp
    ```
 
 2. **Login to your Google account:**
+
    ```bash
    clasp login
    ```
 
 3. **Clone your existing Apps Script project:**
+
    ```bash
    clasp clone [SCRIPT_ID]
    ```
+
    (Find SCRIPT_ID in your Apps Script project URL)
 
 4. **Development workflow:**
+
    ```bash
    # Pull latest changes from cloud
    clasp pull
@@ -285,13 +318,27 @@ To enable local development and syncing with Google Apps Script:
 
 ```
 /church-member-management
-├── appsscript.json          # Apps Script configuration
-├── Code.js                  # Legacy main script (if any)
-├── config.js                # Configuration file
-├── main.js                  # Main script logic
-├── utilities.js             # Utility functions
-└── test.js                  # Test functions
+├── appsscript.json              # Apps Script configuration
+├── .clasp.json                  # Clasp configuration for local development
+├── Code.js                      # Legacy main script (if any)
+├── config.js                    # Configuration file
+├── main.js                      # Main script logic
+├── utilities.js                 # Utility functions
+├── test.js                      # Test functions
+└── development/
+    ├── calendar.js              # Birthday calendar management module
+    ├── main.js                  # Development version of main script
+    ├── config.js                # Development configuration
+    └── test.js                  # Development test functions
 ```
+
+**Key Files:**
+
+- 📁 **`main.js`** - Main workflow logic and form processing
+- 📁 **`development/calendar.js`** - Clean, focused birthday calendar integration
+- 📁 **`config.js`** - Central configuration with field mapping
+- 📁 **`utilities.js`** - Helper functions and utilities
+- 📁 **`test.js`** - Comprehensive testing functions
 
 #### 2.3.3 Configuration Setup
 
@@ -342,18 +389,21 @@ const CONFIG = {
 The system now uses **dynamic field mapping** instead of hardcoded column indices:
 
 **Benefits:**
+
 - ✅ Works regardless of form field order
 - ✅ Automatically handles form structure changes
 - ✅ No need to manually update column indices
 
 **How it works:**
-1. **Email Field**: 
+
+1. **Email Field**:
    - If `QID_EMAIL` is 0 (default): Uses auto-collected respondent email (column 1)
    - If `QID_EMAIL` is set: Uses that specific form field
 2. **Phone Field**: Uses `getColumnIndexForFieldId(CONFIG.QID_PHONE)` to find the correct column
 3. **Other Fields**: All mapped dynamically using their Question IDs
 
 **Finding and Verifying Fields:**
+
 ```javascript
 // Run this function to see all registration form fields and verify configuration
 function logQuestionIDs() {
@@ -379,6 +429,7 @@ function logFieldRequirements() {
 #### 2.3.5 New Features
 
 **1. Edit Response URL Tracking**
+
 - Automatically adds edit response URL to spreadsheet (column A)
 - Allows easy editing of member information later
 
@@ -391,6 +442,7 @@ function logFieldRequirements() {
 - Supports both auto-collected email and custom email fields
 
 **3. Error Handling**
+
 - Graceful handling of missing fields or configuration errors
 - Detailed logging for troubleshooting
 - Admin email notifications for critical errors
@@ -453,14 +505,17 @@ Copy and paste the main processing functions (detailed in API Documentation sect
 **Description**: Main entry point triggered when a form is submitted. Processes new member registration and handles all automated tasks.
 
 **Parameters**:
+
 - `e` (Object): Form submission event object containing form data
 
 **Returns**: void
 
-**Throws**: 
+**Throws**:
+
 - `Error`: When form data is invalid or processing fails
 
 **Example**:
+
 ```javascript
 // Automatically called by Google Apps Script trigger
 function onFormSubmit(e) {
@@ -488,12 +543,15 @@ function onFormSubmit(e) {
 **Description**: Extracts and validates form submission data from the event object.
 
 **Parameters**:
+
 - `e` (Object): Form submission event object
 
-**Returns**: 
+**Returns**:
+
 - `Object`: Formatted member data object
 
 **Return Format**:
+
 ```javascript
 {
   timestamp: Date,
@@ -507,6 +565,7 @@ function onFormSubmit(e) {
 ```
 
 **Example**:
+
 ```javascript
 function extractFormData(e) {
   const responses = e.response.getItemResponses();
@@ -537,70 +596,109 @@ function extractFormData(e) {
 
 ---
 
-#### `addBirthdayToCalendar(memberData)`
+#### `addBirthdayToCalendar(member)` - Calendar Module
 
-**Description**: Adds a recurring birthday event to Google Calendar.
+**Description**: Creates a recurring annual birthday event on Google Calendar. This function is part of the dedicated `calendar.js` module for clean separation of concerns.
+
+**Module**: `development/calendar.js`
 
 **Parameters**:
-- `memberData` (Object): Member information containing name and birthday
 
-**Returns**: 
-- `CalendarEvent`: The created calendar event object
+- `member` (Object): Member information object
+  - `member.englishName` (string): Member's English name
+  - `member.chineseName` (string): Member's Chinese name (optional)
+  - `member.birthday` (Date): Member's birthday date
+  - `member.email` (string): Member's email (optional)
+  - `member.iCare` (string): Member's iCare group (optional)
+
+**Returns**:
+
+- `GoogleAppsScript.Calendar.CalendarEventSeries`: The created recurring birthday event
 
 **Throws**:
-- `Error`: When calendar access fails or event creation fails
+
+- `Error`: When calendar access fails, invalid data provided, or event creation fails
+
+**Features**:
+
+- ✅ **Input Validation**: Validates member data and birthday date
+- ✅ **Calendar Access**: Connects to configured birthday calendar
+- ✅ **Recurring Events**: Creates annual recurring events for 99 years
+- ✅ **Smart Formatting**: Uses combined title and description generation
+- ✅ **Reminders**: Adds 1-week and 1-day reminders automatically
+- ✅ **Error Handling**: Graceful error handling with detailed logging
 
 **Example**:
+
 ```javascript
-/**
- * Adds member birthday to Google Calendar
- * @param {Object} memberData - Member information
- * @param {string} memberData.fullName - Member's full name
- * @param {Date} memberData.birthday - Member's birthday
- * @returns {CalendarEvent} Created calendar event
- */
-function addBirthdayToCalendar(memberData) {
-  try {
-    const calendar = CalendarApp.getCalendarById(CONFIG.BIRTHDAY_CALENDAR_ID);
-    
-    // Check if birthday event already exists
-    const existingEvents = calendar.getEventsForDay(memberData.birthday);
-    const eventTitle = `🎂 ${memberData.fullName}'s Birthday`;
-    
-    const duplicateEvent = existingEvents.find(event => 
-      event.getTitle() === eventTitle
-    );
-    
-    if (duplicateEvent) {
-      console.log(`Birthday event already exists for ${memberData.fullName}`);
-      return duplicateEvent;
-    }
-    
-    // Create new recurring birthday event
-    const event = calendar.createAllDayEvent(
-      eventTitle,
-      memberData.birthday,
-      {
-        description: `Happy Birthday ${memberData.fullName}! 🎉`,
-        location: 'Church Community'
-      }
-    );
-    
-    // Set to recur annually
-    const recurrence = CalendarApp.newRecurrence()
-      .addYearlyRule()
-      .times(50); // Repeat for 50 years
-    
-    event.setRecurrence(recurrence, memberData.birthday);
-    
-    console.log(`Birthday event created for ${memberData.fullName}`);
-    return event;
-    
-  } catch (error) {
-    console.error(`Failed to add birthday for ${memberData.fullName}:`, error);
+// Member data object
+const member = {
+  englishName: 'John Doe',
+  chineseName: '約翰',
+  birthday: new Date('1990-01-15'),
+  email: 'john@example.com',
+  iCare: 'Adult Group'
+};
+
+try {
+  // Create birthday event (called from main.js workflow)
+  const eventSeries = addBirthdayToCalendar(member);
+  Logger.log(`✅ Birthday event created for ${member.englishName}`);
+} catch (error) {
+  Logger.log(`❌ Failed to create birthday event: ${error.message}`);
+}
+```
+
+**Implementation Notes**:
+
+- Uses `formatBirthdayEvent()` helper function for consistent formatting
+- Duplicate checking is handled at the spreadsheet level by `checkIfMemberExists()`
+- Calendar ID is configured in `CONFIG.BIRTHDAY_CALENDAR_ID`
+- Event location is set to "Church Community"
+
+---
+
+#### `formatBirthdayEvent(member)` - Calendar Module
+
+**Description**: Formats both title and description for birthday events. This function combines the previously separate title and description formatting into a single, efficient function.
+
+**Module**: `development/calendar.js`
+
+**Parameters**:
+
+- `member` (Object): Member information object (same as above)
+
+**Returns**:
+
+- `Object`: Object containing formatted title and description
+  - `title` (string): Formatted event title with emoji and names
+  - `description` (string): Detailed event description with member info
+
+**Example**:
+
+```javascript
+const member = {
+  englishName: 'John Doe',
+  chineseName: '約翰',
+  birthday: new Date('1990-01-15'),
+  email: 'john@example.com',
+  iCare: 'Adult Group'
+};
+
+const { title, description } = formatBirthdayEvent(member);
+
+// title: "🎂 John Doe (約翰)'s Birthday"
+// description: "🎉 Happy Birthday John Doe!\n\n📝 Member Details:\n• English Name: John Doe\n• Chinese Name: 約翰\n..."
+```
+
+**Output Format**:
+
+- **Title**: `🎂 [English Name] ([Chinese Name])'s Birthday`
+- **Description**: Includes member details, birth year, email, and iCare group
     throw error;
   }
 }
+
 ```
 
 ---
@@ -624,6 +722,7 @@ function addBirthdayToCalendar(memberData) {
 ```
 
 **Example**:
+
 ```javascript
 /**
  * Generates QR codes for member attendance tracking
@@ -662,15 +761,18 @@ function generateQRCodes(memberData) {
 **Description**: Sends a personalized welcome email to new members with QR codes attached.
 
 **Parameters**:
+
 - `memberData` (Object): Member information
 - `qrCodes` (Object): QR code URLs for different locations
 
 **Returns**: void
 
 **Throws**:
+
 - `Error`: When email sending fails
 
 **Example**:
+
 ```javascript
 /**
  * Sends welcome email with QR codes to new member
@@ -737,12 +839,15 @@ function sendWelcomeEmail(memberData, qrCodes) {
 **Description**: Checks if a member is already registered based on email or phone number.
 
 **Parameters**:
+
 - `memberData` (Object): Member information to check
 
 **Returns**:
+
 - `boolean`: True if duplicate found, false otherwise
 
 **Example**:
+
 ```javascript
 /**
  * Checks for duplicate member registration
@@ -797,9 +902,11 @@ function isDuplicate(memberData) {
 **Description**: Standardizes phone number format for comparison.
 
 **Parameters**:
+
 - `phone` (string): Raw phone number
 
 **Returns**:
+
 - `string`: Cleaned phone number with only digits
 
 #### `getEntryId(fieldName)`
@@ -807,9 +914,11 @@ function isDuplicate(memberData) {
 **Description**: Gets the entry ID for a form field to create pre-filled URLs.
 
 **Parameters**:
+
 - `fieldName` (string): Name of the form field
 
 **Returns**:
+
 - `string`: Entry ID for the field
 
 #### `notifyAdmin(error)`
@@ -817,6 +926,7 @@ function isDuplicate(memberData) {
 **Description**: Sends error notifications to administrators.
 
 **Parameters**:
+
 - `error` (Error): Error object to report
 
 **Returns**: void
@@ -956,6 +1066,7 @@ function testCalendarIntegration() {
 ### Step 1: Prepare for Deployment
 
 **1. Update configuration**:
+
 - Replace all placeholder IDs with your actual Google service IDs
 - Verify field titles match your form exactly
 - Test all functions locally
@@ -973,6 +1084,7 @@ clasp open
 ### Step 2: Set Up Permissions
 
 **1. Run initial setup**:
+
 - Go to Google Apps Script editor
 - Run any function to trigger permission prompts
 - Grant all requested permissions:
@@ -1002,10 +1114,12 @@ function testPermissions() {
 ### Step 3: Create Form Submission Trigger
 
 **1. Go to Triggers**:
+
 - In Apps Script editor: Left sidebar → Triggers ⏰
 - Click "+ Add Trigger"
 
 **2. Configure trigger**:
+
 - Choose function: `onFormSubmit`
 - Choose deployment: Head
 - Select event source: From form
@@ -1014,6 +1128,7 @@ function testPermissions() {
 - Notify on failure: Immediately
 
 **3. Save and test**:
+
 - Submit a test form entry
 - Check execution transcript for any errors
 - Verify email was sent and calendar event created
@@ -1021,6 +1136,7 @@ function testPermissions() {
 ### Step 4: Set Up Error Monitoring
 
 **1. Enable Stackdriver logging**:
+
 - In `appsscript.json`, ensure `"exceptionLogging": "STACKDRIVER"`
 
 **2. Create error notification function**:
@@ -1099,6 +1215,7 @@ function dailyHealthCheck() {
 **Symptoms**: Script fails with permission errors
 
 **Solutions**:
+
 1. **Re-run authorization**: Delete triggers, run a function manually, re-grant permissions
 2. **Check calendar permissions**: Ensure calendar is shared with script owner
 3. **Verify spreadsheet access**: Check if spreadsheet exists and is accessible
@@ -1108,7 +1225,9 @@ function dailyHealthCheck() {
 **Symptoms**: Form data not extracted properly
 
 **Solutions**:
+
 1. **Run field mapping check**:
+
    ```javascript
    logQuestionIDs(); // Shows all form fields and their status
    ```
@@ -1122,11 +1241,14 @@ function dailyHealthCheck() {
 **Symptoms**: QR code URLs are broken or empty
 
 **Solutions**:
+
 1. **Check attendance form ID**: Verify `CONFIG.ATTENDANCE_FORM_ID` is correct
-2. **Test entry ID detection**: 
+2. **Test entry ID detection**:
+
    ```javascript
    testEntryIdDetection(); // Shows detected entry IDs
    ```
+
 3. **Manual entry ID override**: Set entry IDs manually in config if auto-detection fails
 
 #### Issue 4: Emails not sending
@@ -1134,9 +1256,11 @@ function dailyHealthCheck() {
 **Symptoms**: Welcome emails not received
 
 **Solutions**:
+
 1. **Check Gmail quota**: Google Apps Script has daily email limits
 2. **Verify email addresses**: Ensure form collects valid email addresses  
 3. **Test email function**:
+
    ```javascript
    sendTestEmail(); // Sends test email to verify setup
    ```
@@ -1146,9 +1270,11 @@ function dailyHealthCheck() {
 **Symptoms**: Duplicate members being processed
 
 **Solutions**:
+
 1. **Check required fields**: Only required form fields are checked for duplicates
 2. **Verify phone number format**: Ensure consistent phone number formatting
 3. **Test duplicate logic**:
+
    ```javascript
    testDuplicateDetection(); // Tests duplicate prevention logic
    ```
@@ -1194,12 +1320,14 @@ We welcome contributions to improve this church management system!
 ### Coding Standards
 
 **JavaScript Style**:
+
 - Use JSDoc comments for all functions
 - Follow camelCase naming convention
 - Include error handling in all functions
 - Add comprehensive logging
 
 **Documentation**:
+
 - Update README.md for any new features
 - Include code examples in function documentation
 - Add troubleshooting entries for new issues
@@ -1207,6 +1335,7 @@ We welcome contributions to improve this church management system!
 ### Feature Requests
 
 **Commonly requested features**:
+
 - [ ] Integration with church database systems
 - [ ] Advanced reporting and analytics
 - [ ] Mobile app companion
@@ -1215,6 +1344,7 @@ We welcome contributions to improve this church management system!
 - [ ] Bulk import/export functionality
 
 **To request features**:
+
 1. Open an issue with "Feature Request" label
 2. Describe the use case and expected behavior
 3. Include mockups or examples if possible
@@ -1223,7 +1353,9 @@ We welcome contributions to improve this church management system!
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the GNU General Public License v3.0 - see the [LICENSE](LICENSE) file for details.
+
+This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 
 ---
 
