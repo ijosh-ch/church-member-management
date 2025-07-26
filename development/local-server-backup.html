@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Church Member Management - Local Test</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            line-height: 1.6        <a href="#" class="option-card" onclick="getQRCode()">
+            <div class="option-icon">📱</div>
+            <div class="option-title">Get QR Code</div>
+            <div class="option-description">Receive your personalized QR codes for attendance via email</div>
+        </a>         margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        
+        .container {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+            text-align: center;
+            width: 100%;
+            max-width: 420px;
+            margin: 1rem;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .logo {
+            font-size: 3rem;
+            margin-bottom: 0.5rem;
+            line-height: 1;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 0.5rem;
+            font-size: 1.5rem;
+            font-weight: 600;
+            line-height: 1.2;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 2rem;
+            font-size: 0.95rem;
+            line-height: 1.4;
+        }
+        
+        .option-card {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 12px;
+            padding: 1.25rem;
+            margin: 1rem 0;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            text-decoration: none;
+            color: inherit;
+            display: block;
+            position: relative;
+            overflow: hidden;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+        }
+        
+        .option-card:hover,
+        .option-card:active {
+            background: #e9ecef;
+            border-color: #667eea;
+            transform: translateY(-1px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.15);
+        }
+        
+        .option-card:active {
+            transform: translateY(0);
+            transition-duration: 0.1s;
+        }
+        
+        .option-icon {
+            font-size: 2.5rem;
+            margin-bottom: 0.75rem;
+            line-height: 1;
+        }
+        
+        .option-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: #333;
+            line-height: 1.3;
+        }
+        
+        .option-description {
+            font-size: 0.85rem;
+            color: #666;
+            line-height: 1.4;
+        }
+        
+        .footer {
+            margin-top: 2rem;
+            padding-top: 1rem;
+            border-top: 1px solid #e9ecef;
+            font-size: 0.8rem;
+            color: #999;
+            line-height: 1.4;
+        }
+        
+        /* Form styles for responsive design */
+        .form-input {
+            width: 100%;
+            padding: 0.875rem 1rem;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 1rem;
+            box-sizing: border-box;
+            transition: border-color 0.3s ease;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+        
+        .form-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .form-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: #333;
+            font-size: 0.9rem;
+            text-align: left;
+        }
+        
+        .form-group {
+            text-align: left;
+            margin: 1.5rem 0;
+        }
+        
+        .btn {
+            background: #667eea;
+            color: white;
+            padding: 0.875rem 2rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            margin-bottom: 1rem;
+            transition: all 0.3s ease;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+        }
+        
+        .btn:hover,
+        .btn:active {
+            background: #5a67d8;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+        
+        .btn:active {
+            transform: translateY(0);
+        }
+        
+        .btn:disabled {
+            background: #a0aec0;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+            font-size: 0.9rem;
+            padding: 0.625rem 1.5rem;
+            width: auto;
+            margin: 0;
+        }
+        
+        .btn-secondary:hover,
+        .btn-secondary:active {
+            background: #545b62;
+        }
+        
+        .result {
+            margin-top: 1rem;
+            padding: 1rem;
+            border-radius: 8px;
+            display: none;
+            font-size: 0.9rem;
+            line-height: 1.4;
+        }
+        
+        .result.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .result.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .demo-info {
+            background: #e3f2fd;
+            border: 1px solid #2196f3;
+            color: #1976d2;
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+            font-size: 0.85rem;
+            text-align: left;
+        }
+        
+        /* Mobile-specific improvements */
+        @media (max-width: 480px) {
+            body {
+                padding: 0.5rem;
+            }
+            
+            .container {
+                padding: 1.25rem;
+                margin: 0.5rem;
+                border-radius: 12px;
+                min-height: calc(100vh - 1rem);
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+            }
+            
+            .logo {
+                font-size: 2.5rem;
+            }
+            
+            h1 {
+                font-size: 1.375rem;
+            }
+            
+            .subtitle {
+                font-size: 0.9rem;
+                margin-bottom: 1.5rem;
+            }
+            
+            .option-card {
+                padding: 1rem;
+                margin: 0.75rem 0;
+            }
+            
+            .option-icon {
+                font-size: 2.25rem;
+                margin-bottom: 0.5rem;
+            }
+            
+            .option-title {
+                font-size: 1rem;
+            }
+            
+            .option-description {
+                font-size: 0.8rem;
+            }
+            
+            .form-input {
+                padding: 1rem;
+                font-size: 16px; /* Prevents zoom on iOS */
+            }
+            
+            .btn {
+                padding: 1rem 2rem;
+                font-size: 1rem;
+            }
+            
+            .footer {
+                margin-top: 1.5rem;
+                font-size: 0.75rem;
+            }
+        }
+        
+        /* Extra small screens */
+        @media (max-width: 360px) {
+            .container {
+                padding: 1rem;
+            }
+            
+            .logo {
+                font-size: 2.25rem;
+            }
+            
+            h1 {
+                font-size: 1.25rem;
+            }
+            
+            .option-card {
+                padding: 0.875rem;
+            }
+            
+            .option-icon {
+                font-size: 2rem;
+            }
+        }
+        
+        /* Landscape orientation on mobile */
+        @media (max-height: 500px) and (orientation: landscape) {
+            .container {
+                min-height: auto;
+                margin: 0.5rem;
+                padding: 1rem;
+            }
+            
+            .logo {
+                font-size: 2rem;
+                margin-bottom: 0.25rem;
+            }
+            
+            h1 {
+                font-size: 1.25rem;
+                margin-bottom: 0.25rem;
+            }
+            
+            .subtitle {
+                margin-bottom: 1rem;
+                font-size: 0.85rem;
+            }
+            
+            .option-card {
+                margin: 0.5rem 0;
+                padding: 0.75rem;
+            }
+            
+            .footer {
+                margin-top: 1rem;
+            }
+        }
+        
+        /* Dark mode support */
+        @media (prefers-color-scheme: dark) {
+            body {
+                background: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
+            }
+            
+            .container {
+                background: #2d3748;
+                color: #e2e8f0;
+            }
+            
+            h1 {
+                color: #e2e8f0;
+            }
+            
+            .subtitle {
+                color: #a0aec0;
+            }
+            
+            .option-card {
+                background: #4a5568;
+                border-color: #718096;
+                color: #e2e8f0;
+            }
+            
+            .option-card:hover,
+            .option-card:active {
+                background: #718096;
+                border-color: #667eea;
+            }
+            
+            .option-title {
+                color: #e2e8f0;
+            }
+            
+            .option-description {
+                color: #a0aec0;
+            }
+            
+            .form-input {
+                background: #4a5568;
+                border-color: #718096;
+                color: #e2e8f0;
+            }
+            
+            .form-input::placeholder {
+                color: #a0aec0;
+            }
+            
+            .form-label {
+                color: #e2e8f0;
+            }
+            
+            .footer {
+                border-top-color: #718096;
+                color: #a0aec0;
+            }
+            
+            .demo-info {
+                background: #2d3748;
+                border-color: #4299e1;
+                color: #63b3ed;
+            }
+        }
+        
+        /* Reduce motion for accessibility */
+        @media (prefers-reduced-motion: reduce) {
+            .option-card,
+            .btn {
+                transition: none;
+            }
+            
+            .option-card:hover,
+            .option-card:active,
+            .btn:hover,
+            .btn:active {
+                transform: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">⛪</div>
+        <h1>Church Member Management</h1>
+        <p class="subtitle">Welcome! Please choose an option below:</p>
+        
+        <div class="demo-info">
+            <strong>🧪 Local Demo Mode</strong><br>
+            Registration form is live! QR code function is simulated for demonstration purposes.
+        </div>
+        
+        <a href="#" class="option-card" onclick="registerNewMember()">
+            <div class="option-icon">📝</div>
+            <div class="option-title">Register New Member</div>
+            <div class="option-description">Join our church community by filling out the registration form</div>
+        </a>
+        
+        <a href="#" class="option-card" onclick="getQRCode()">
+            <div class="option-icon">�</div>
+            <div class="option-title">Get QR Code</div>
+            <div class="option-description">Receive your personalized QR codes for attendance via email</div>
+        </a>
+        
+        <div class="footer">
+            <p>Need help? Contact our church office.</p>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * Redirects to the actual registration form
+         */
+        function registerNewMember() {
+            // Show loading state
+            const button = event.target.closest('.option-card');
+            const originalContent = button.innerHTML;
+            button.innerHTML = `
+                <div class="option-icon">⏳</div>
+                <div class="option-title">Loading...</div>
+                <div class="option-description">Redirecting to registration form</div>
+            `;
+            
+            // Brief delay for visual feedback, then redirect
+            setTimeout(() => {
+                // Actual Google Form URL
+                const formUrl = 'https://forms.gle/hHBSeC3dj6VV1wQQ8';
+                
+                // Open the form in a new tab/window
+                window.open(formUrl, '_blank');
+                
+                // Restore button content
+                button.innerHTML = originalContent;
+            }, 800);
+        }
+        
+        /**
+         * Shows the get QR code interface
+         */
+        function getQRCode() {
+            // Replace the main content with QR code request form
+            document.querySelector('.container').innerHTML = `
+                <div class="logo">�</div>
+                <h1>Get Your QR Code</h1>
+                <p class="subtitle">Enter your email or WhatsApp number to receive your personalized QR codes</p>
+                
+                <div class="demo-info">
+                    <strong>🧪 Demo Mode</strong><br>
+                    This simulates generating and sending QR codes to the member's email.
+                </div>
+                
+                <div class="form-group">
+                    <label for="searchValue" class="form-label">Email Address:</label>
+                    <input type="text" 
+                           id="searchValue" 
+                           class="form-input"
+                           placeholder="example@email.com"
+                           autocomplete="email"
+                           inputmode="email">
+                </div>
+                
+                <button onclick="sendQRCode()" 
+                        class="btn"
+                        id="sendButton">
+                    📱 Send QR Codes
+                </button>
+                
+                <button onclick="goBack()" 
+                        class="btn btn-secondary">
+                    ← Back to Main Menu
+                </button>
+                
+                <div id="result" class="result"></div>
+                
+                <div class="footer">
+                    <p>You will receive QR codes for both Taipei and Zhongli locations. Check your spam folder if you don't see the email.</p>
+                </div>
+            `;
+            
+            // Focus on the input field after a short delay to ensure it's rendered
+            setTimeout(() => {
+                const input = document.getElementById('searchValue');
+                if (input) {
+                    input.focus();
+                    // For mobile, scroll to input to ensure visibility
+                    input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }, 100);
+            
+            // Add enter key support
+            document.getElementById('searchValue').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    sendQRCode();
+                }
+            });
+            
+            // Add input validation and formatting
+            document.getElementById('searchValue').addEventListener('input', function(e) {
+                const value = e.target.value;
+                
+                // Auto-detect if it's a phone number and adjust input mode
+                if (value.match(/^[\+\d\s\-\(\)]/)) {
+                    e.target.inputMode = 'tel';
+                    e.target.setAttribute('autocomplete', 'tel');
+                } else if (value.includes('@')) {
+                    e.target.inputMode = 'email';
+                    e.target.setAttribute('autocomplete', 'email');
+                }
+            });
+        }
+        
+        /**
+         * Simulates generating and sending QR codes to the member (local demo)
+         */
+        function sendQRCode() {
+            const searchValue = document.getElementById('searchValue').value.trim();
+            const sendButton = document.getElementById('sendButton');
+            const resultDiv = document.getElementById('result');
+            
+            if (!searchValue) {
+                showResult('Please enter an email address or WhatsApp number.', 'error');
+                return;
+            }
+            
+            // Validate input format
+            const isEmail = searchValue.includes('@');
+            const isPhone = /^[\+\d\s\-\(\)]+$/.test(searchValue);
+            
+            if (!isEmail && !isPhone) {
+                showResult('Please enter a valid email address or WhatsApp number.', 'error');
+                return;
+            }
+            
+            // Show loading state with QR generation message
+            sendButton.disabled = true;
+            sendButton.innerHTML = '🔄 Sending...';
+            resultDiv.style.display = 'none';
+            
+            // Simulate QR code generation and email sending process
+            setTimeout(() => {
+                // Simulate different stages of the process
+                sendButton.innerHTML = '📧 Sending Email...';
+                
+                setTimeout(() => {
+                    // Reset button
+                    sendButton.disabled = false;
+                    sendButton.innerHTML = '📱 Send QR Codes';
+                    
+                    // Simulate different responses
+                    const rand = Math.random();
+                    if (rand > 0.7) {
+                        // Simulate member not found with registration option for emails
+                        if (isEmail) {
+                            showResultWithRegistration(
+                                `❌ Email "${searchValue}" is not found in our member database.
+          
+🆕 Would you like to register as a new member?
+
+📝 Click the link below to register:
+
+After completing registration, you'll receive your QR codes automatically via email.`,
+                                'https://forms.gle/hHBSeC3dj6VV1wQQ8'
+                            );
+                        } else {
+                            showResult('Member not found. Please check your email or WhatsApp number and try again.', 'error');
+                        }
+                    } else {
+                        // Simulate success
+                        const memberType = isEmail ? 'email address' : 'WhatsApp number';
+                        showResult(`✅ QR codes generated and sent successfully to ${searchValue}! 
+                                   
+                        📧 Email includes:
+                        • Taipei QR code with "IFGF TPE" text
+                        • Zhongli QR code with "IFGF ZL" text
+                        • Instructions for attendance scanning
+                        
+                        Please check your ${isEmail ? 'email inbox' : 'email associated with this WhatsApp number'} (including spam folder).`, 'success');
+                        
+                        // Clear the input field on success
+                        document.getElementById('searchValue').value = '';
+                    }
+                }, 1500);
+            }, 2000);
+        }
+        
+        /**
+         * Shows a result message
+         */
+        function showResult(message, type) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.textContent = message;
+            resultDiv.style.display = 'block';
+            resultDiv.className = `result ${type}`;
+            
+            // Scroll to result on mobile to ensure visibility
+            if (window.innerWidth <= 480) {
+                setTimeout(() => {
+                    resultDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }, 100);
+            }
+        }
+        
+        /**
+         * Shows a result message with registration option
+         */
+        function showResultWithRegistration(message, registrationUrl) {
+            const resultDiv = document.getElementById('result');
+            
+            // Create HTML content with registration button
+            resultDiv.innerHTML = `
+                <div style="text-align: left;">
+                    <p style="margin-bottom: 15px; white-space: pre-line;">${message}</p>
+                    <div style="text-align: center; margin-top: 20px;">
+                        <a href="${registrationUrl}" 
+                           target="_blank"
+                           style="display: inline-block; 
+                                  background: #4CAF50; 
+                                  color: white; 
+                                  padding: 12px 24px; 
+                                  text-decoration: none; 
+                                  border-radius: 8px; 
+                                  font-weight: bold;
+                                  margin: 5px;">
+                            🆕 Register as New Member
+                        </a>
+                        <br>
+                        <button onclick="goBack()" 
+                                style="background: #6c757d; 
+                                       color: white; 
+                                       padding: 8px 16px; 
+                                       border: none; 
+                                       border-radius: 6px; 
+                                       margin-top: 10px; 
+                                       cursor: pointer;">
+                            ← Back to Menu
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result error';
+            
+            // Scroll to result on mobile to ensure visibility
+            if (window.innerWidth <= 480) {
+                setTimeout(() => {
+                    resultDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }, 100);
+            }
+        }
+        
+        /**
+         * Goes back to the main menu
+         */
+        function goBack() {
+            location.reload();
+        }
+        
+        // Mobile-friendly enhancements
+        document.addEventListener('DOMContentLoaded', function() {
+            // Add touch feedback for better mobile experience
+            const cards = document.querySelectorAll('.option-card');
+            cards.forEach(card => {
+                card.addEventListener('touchstart', function() {
+                    this.style.transform = 'scale(0.98)';
+                }, { passive: true });
+                
+                card.addEventListener('touchend', function() {
+                    this.style.transform = '';
+                }, { passive: true });
+                
+                card.addEventListener('touchcancel', function() {
+                    this.style.transform = '';
+                }, { passive: true });
+            });
+            
+            // Prevent zoom on double-tap for iOS
+            let lastTouchEnd = 0;
+            document.addEventListener('touchend', function(event) {
+                const now = (new Date()).getTime();
+                if (now - lastTouchEnd <= 300) {
+                    event.preventDefault();
+                }
+                lastTouchEnd = now;
+            }, false);
+            
+            // Add viewport height adjustment for mobile browsers
+            function setViewportHeight() {
+                const vh = window.innerHeight * 0.01;
+                document.documentElement.style.setProperty('--vh', `${vh}px`);
+            }
+            
+            setViewportHeight();
+            window.addEventListener('resize', setViewportHeight);
+            window.addEventListener('orientationchange', function() {
+                setTimeout(setViewportHeight, 100);
+            });
+            
+            // Display network info for testing
+            if (navigator.onLine) {
+                console.log('📶 Network Status: Online');
+                console.log('🌐 User Agent:', navigator.userAgent);
+                console.log('📱 Screen:', window.screen.width + 'x' + window.screen.height);
+                console.log('🖼️ Viewport:', window.innerWidth + 'x' + window.innerHeight);
+            }
+        });
+    </script>
+</body>
+</html>

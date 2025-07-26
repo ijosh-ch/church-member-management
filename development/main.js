@@ -74,9 +74,180 @@ function onFormSubmit(e) {
  * @param {object} member The member details object.
  * @returns {object} An object containing the generated blobs, e.g., { taipei: Blob, zhongli: Blob }.
  */
+/**
+ * Enhanced QR code generation with text overlay in the center
+ * @param {string} data - The data to encode in the QR code
+ * @param {string} centerText - Text to display in center (e.g., "IFGF TPE")
+ * @param {string} memberName - Member name for filename
+ * @param {string} location - Location for filename
+ * @returns {Blob} QR code image blob with text overlay
+ */
+function generateQRCodeWithText(data, centerText, memberName, location) {
+  try {
+    Logger.log(`🔗 Generating QR code for ${memberName} - ${location} with text: ${centerText}`);
+    
+    // Check if advanced QR is enabled in config
+    if (CONFIG.QR_CODE_SETTINGS && CONFIG.QR_CODE_SETTINGS.USE_ADVANCED_QR) {
+      // Try advanced QR code with actual text overlay
+      const advancedQR = generateAdvancedQRCodeWithTextOverlay(data, centerText, memberName, location);
+      if (advancedQR) {
+        Logger.log(`✅ Generated advanced QR code with text overlay: ${centerText}`);
+        return advancedQR;
+      }
+      Logger.log(`⚠️ Advanced QR generation failed, falling back to enhanced QR`);
+    }
+    
+    // Enhanced QR Server API with high error correction for better readability
+    const size = CONFIG.QR_CODE_SETTINGS?.SIZE || '400x400';
+    const ecc = CONFIG.QR_CODE_SETTINGS?.ERROR_CORRECTION || 'H';
+    const bgColor = CONFIG.QR_CODE_SETTINGS?.BACKGROUND_COLOR || 'ffffff';
+    const fgColor = CONFIG.QR_CODE_SETTINGS?.FOREGROUND_COLOR || '000000';
+    
+    const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=${size}&ecc=${ecc}&bgcolor=${bgColor}&color=${fgColor}&data=${encodeURIComponent(data)}`;
+    
+    const response = UrlFetchApp.fetch(qrApiUrl, { 
+      muteHttpExceptions: true,
+      headers: {
+        'User-Agent': 'Church Management System/1.0'
+      }
+    });
+    
+    if (response.getResponseCode() !== 200) {
+      Logger.log(`❌ QR API failed with code: ${response.getResponseCode()}`);
+      return generateBasicQRCode(data, memberName, location);
+    }
+    
+    const fileName = `QRCode_${location}_${memberName.replace(/\s+/g, '_')}.png`;
+    const qrBlob = response.getBlob().setName(fileName);
+    
+    Logger.log(`✅ Generated enhanced QR code for ${memberName} - ${location}`);
+    return qrBlob;
+    
+  } catch (error) {
+    Logger.log(`❌ Error generating QR code with text: ${error.message}`);
+    return generateBasicQRCode(data, memberName, location);
+  }
+}
+
+/**
+ * Advanced QR Code generation with actual text overlay using QRCode Monkey API
+ * @param {string} data - The data to encode in QR code
+ * @param {string} centerText - Text to overlay in center
+ * @param {string} memberName - Member name for filename
+ * @param {string} location - Location for filename
+ * @returns {Blob|null} QR code blob or null if failed
+ */
+function generateAdvancedQRCodeWithTextOverlay(data, centerText, memberName, location) {
+  try {
+    Logger.log(`🎨 Attempting advanced QR with text overlay: ${centerText}`);
+    
+    // QRCode Monkey API endpoint for custom QR codes
+    const apiUrl = 'https://api.qrcode-monkey.com/qr/custom';
+    
+    const payload = {
+      data: data,
+      config: {
+        body: 'square',
+        eye: 'frame0',
+        eyeBall: 'ball0',
+        bodyColor: CONFIG.QR_CODE_SETTINGS?.FOREGROUND_COLOR || '#000000',
+        bgColor: CONFIG.QR_CODE_SETTINGS?.BACKGROUND_COLOR || '#FFFFFF',
+        eye1Color: '#000000',
+        eye2Color: '#000000',
+        eye3Color: '#000000',
+        eyeBall1Color: '#000000',
+        eyeBall2Color: '#000000',
+        eyeBall3Color: '#000000',
+        gradientColor1: '',
+        gradientColor2: '',
+        gradientType: 'linear',
+        gradientOnEyes: false,
+        logo: '',
+        logoMode: 'default'
+      },
+      size: parseInt(CONFIG.QR_CODE_SETTINGS?.SIZE?.split('x')[0]) || 400,
+      download: false,
+      file: 'png'
+    };
+
+    // Add text overlay configuration
+    if (centerText && centerText.trim() !== '') {
+      payload.config.logoText = centerText.trim();
+      payload.config.logoTextColor = '#FFFFFF';
+      payload.config.logoTextSize = Math.floor(payload.size / 16); // Dynamic text size
+      payload.config.logoTextFont = 'Arial';
+      payload.config.logoTextBg = '#000000';
+      payload.config.logoTextBorder = 2;
+    }
+
+    const options = {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'Church Management System/1.0'
+      },
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    };
+
+    const response = UrlFetchApp.fetch(apiUrl, options);
+    
+    if (response.getResponseCode() === 200) {
+      const responseData = JSON.parse(response.getContentText());
+      
+      if (responseData && responseData.imageUrl) {
+        // Fetch the generated image
+        const imageResponse = UrlFetchApp.fetch(responseData.imageUrl, { muteHttpExceptions: true });
+        
+        if (imageResponse.getResponseCode() === 200) {
+          const fileName = `QRCode_${location}_${memberName.replace(/\s+/g, '_')}_Advanced.png`;
+          Logger.log(`✅ Successfully generated advanced QR with text: ${centerText}`);
+          return imageResponse.getBlob().setName(fileName);
+        }
+      }
+    }
+    
+    Logger.log(`⚠️ QRCode Monkey API failed: ${response.getResponseCode()}`);
+    return null;
+    
+  } catch (error) {
+    Logger.log(`⚠️ Error with advanced QR API: ${error.message}`);
+    return null;
+  }
+}
+
+/**
+ * Fallback function to generate basic QR code without text overlay
+ * @param {string} data - The data to encode
+ * @param {string} memberName - Member name for filename
+ * @param {string} location - Location for filename
+ * @returns {Blob} Basic QR code blob
+ */
+function generateBasicQRCode(data, memberName, location) {
+  try {
+    Logger.log(`🔧 Generating basic QR code fallback for ${memberName} - ${location}`);
+    
+    const size = CONFIG.QR_CODE_SETTINGS?.SIZE || '300x300';
+    const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=${size}&data=${encodeURIComponent(data)}`;
+    
+    const response = UrlFetchApp.fetch(qrApiUrl, { 
+      muteHttpExceptions: true,
+      headers: {
+        'User-Agent': 'Church Management System/1.0'
+      }
+    });
+    
+    const fileName = `QRCode_${location}_${memberName.replace(/\s+/g, '_')}_Basic.png`;
+    Logger.log(`✅ Generated basic QR code for ${memberName} - ${location}`);
+    
+    return response.getBlob().setName(fileName);
+  } catch (error) {
+    Logger.log(`❌ Even basic QR generation failed: ${error.message}`);
+    throw new Error(`Failed to generate QR code for ${memberName}`);
+  }
+}
+
 function generateQRCodeBlobs(member) {
-  const qrApiBaseUrl = "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=";
-  
   // Build URL with available entry IDs
   let basePrefilledUrl = `${CONFIG.ATTENDANCE_FORM_URL}?usp=pp_url`;
   
@@ -106,21 +277,12 @@ function generateQRCodeBlobs(member) {
   const prefilledUrlZhongli = locationEntryId ? 
     `${basePrefilledUrl}&${locationEntryId}=Zhongli` : basePrefilledUrl;
 
-  const qrCodeUrlTaipei = qrApiBaseUrl + encodeURIComponent(prefilledUrlTaipei);
-  const qrCodeUrlZhongli = qrApiBaseUrl + encodeURIComponent(prefilledUrlZhongli);
-
-  // Fetch both blobs concurrently for a minor speed improvement
-  const requests = [{
-    url: qrCodeUrlTaipei,
-    muteHttpExceptions: true
-  }, {
-    url: qrCodeUrlZhongli,
-    muteHttpExceptions: true
-  }];
-  const responses = UrlFetchApp.fetchAll(requests);
-
-  const qrCodeBlobTaipei = responses[0].getBlob().setName(`QRCode_Taipei_${member.englishName}.png`);
-  const qrCodeBlobZhongli = responses[1].getBlob().setName(`QRCode_Zhongli_${member.englishName}.png`);
+  // Generate QR codes with custom text overlay using config settings
+  const taipeiText = CONFIG.QR_CODE_SETTINGS?.TAIPEI_TEXT || 'IFGF TPE';
+  const zhongliText = CONFIG.QR_CODE_SETTINGS?.ZHONGLI_TEXT || 'IFGF ZL';
+  
+  const qrCodeBlobTaipei = generateQRCodeWithText(prefilledUrlTaipei, taipeiText, member.englishName, 'Taipei');
+  const qrCodeBlobZhongli = generateQRCodeWithText(prefilledUrlZhongli, zhongliText, member.englishName, 'Zhongli');
 
   Logger.log(`✅ Generated QR code blobs for ${member.englishName}.`);
   return {

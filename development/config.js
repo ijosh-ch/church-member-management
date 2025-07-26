@@ -50,6 +50,17 @@ const CONFIG = {
   LOCATION_TAIPEI_URL: 'https://g.co/kgs/ue5CEtv',
   LOCATION_ZHONGLI_URL: 'https://g.co/kgs/xKRLyXC',
 
+  // --- QR Code Generation Settings ---
+  QR_CODE_SETTINGS: {
+    USE_ADVANCED_QR: true,        // Set to false for basic QR codes
+    SIZE: '400x400',              // QR code size
+    ERROR_CORRECTION: 'H',        // High error correction for text overlay
+    TAIPEI_TEXT: 'IFGF TPE',      // Text overlay for Taipei QR codes
+    ZHONGLI_TEXT: 'IFGF ZL',      // Text overlay for Zhongli QR codes
+    BACKGROUND_COLOR: 'ffffff',   // White background
+    FOREGROUND_COLOR: '000000'    // Black foreground
+  },
+
   // --- Admin Notification ---
   ADMIN_EMAIL: Session.getActiveUser().getEmail() // Defaults to the script owner.
 };

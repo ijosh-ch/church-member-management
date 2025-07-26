@@ -1,29 +1,45 @@
 /**
- * @fileoverview Birthday calendar management functions for Church Member Management System
- * @description Handles Google Calendar integration specifically for member birthdays
+ * @fileoverview
+ * Birthday calendar management functions for the Church Member Management System.
+ * Provides Google Calendar integration for recurring member birthday events.
+ *
+ * This module exposes:
+ *   - addBirthdayToCalendar(member): Adds a recurring birthday event to the configured calendar.
+ *   - formatBirthdayEvent(member): Formats the event title and description for birthdays.
+ *
+ * Usage:
+ *   - Ensure CONFIG.BIRTHDAY_CALENDAR_ID is set to a valid Google Calendar ID.
+ *   - Pass a member object with at least 'englishName' and 'birthday' fields.
+ *   - Optionally include 'chineseName', 'email', and 'iCare' for richer event details.
  */
 
 /**
- * Creates a recurring annual birthday event on the specified calendar.
- * @param {Object} member - The member details object
- * @param {string} member.englishName - Member's English name
- * @param {string} member.chineseName - Member's Chinese name
- * @param {Date} member.birthday - Member's birthday date
- * @throws {Error} When calendar is not found or event creation fails
- * @returns {GoogleAppsScript.Calendar.CalendarEventSeries} The created recurring birthday event
- * 
+ * Adds a recurring annual birthday event for a member to the configured Google Calendar.
+ *
+ * @function addBirthdayToCalendar
+ * @param {Object} member - Member details object. Must include at least 'englishName' and 'birthday'.
+ * @param {string} member.englishName - Member's English name (required)
+ * @param {string} [member.chineseName] - Member's Chinese name (optional)
+ * @param {Date} member.birthday - Member's birthday as a Date object (required)
+ * @param {string} [member.email] - Member's email address (optional)
+ * @param {string} [member.iCare] - Member's iCare group (optional)
+ * @throws {Error} If calendar is not found, birthday is invalid, or event creation fails
+ * @returns {GoogleAppsScript.Calendar.CalendarEventSeries} The created recurring birthday event series
+ *
  * @example
+ * // Example usage:
  * const member = {
  *   englishName: 'John Doe',
  *   chineseName: '約翰',
- *   birthday: new Date('1990-01-15')
+ *   birthday: new Date('1990-01-15'),
+ *   email: 'john@example.com',
+ *   iCare: 'Alpha'
  * };
- * 
  * try {
  *   const eventSeries = addBirthdayToCalendar(member);
- *   console.log('Birthday event created successfully');
+ *   Logger.log('Birthday event created successfully');
  * } catch (error) {
- *   console.error('Failed to create birthday event:', error);
+ *   Logger.log('Failed to create birthday event: ' + error.message);
  * }
  */
 function addBirthdayToCalendar(member) {
@@ -88,22 +104,25 @@ function addBirthdayToCalendar(member) {
 }
 
 /**
- * Formats both the title and description for a birthday event.
- * @param {Object} member - The member details object
- * @returns {Object} Object containing formatted title and description
- * @returns {string} returns.title - Formatted event title
- * @returns {string} returns.description - Formatted event description
- * 
+ * Formats the event title and description for a member's birthday event.
+ *
+ * @function formatBirthdayEvent
+ * @param {Object} member - Member details object. Should include 'englishName', 'birthday', and optionally 'chineseName', 'email', 'iCare'.
+ * @returns {Object} Object with:
+ *   - title {string}: Formatted event title (e.g., "🎂 John Doe (約翰)'s Birthday")
+ *   - description {string}: Formatted event description with member details
+ *
  * @example
  * const member = {
  *   englishName: 'John Doe',
  *   chineseName: '約翰',
  *   birthday: new Date('1990-01-15'),
- *   email: 'john@example.com'
+ *   email: 'john@example.com',
+ *   iCare: 'Alpha'
  * };
  * const { title, description } = formatBirthdayEvent(member);
- * // title: "🎂 John (約翰)'s Birthday"
- * // description: "🎉 Happy Birthday John!..."
+ * // title: "🎂 John Doe (約翰)'s Birthday"
+ * // description: "🎉 Happy Birthday John Doe! ..."
  */
 function formatBirthdayEvent(member) {
   // Format title
