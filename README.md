@@ -36,15 +36,37 @@ This project demonstrates how to build a complete church member management syste
 
 ```mermaid
 graph TB
-    A[Google Form] --> B[Google Sheets]
-    B --> C[Google Apps Script]
-    C --> D[Google Calendar]
-    C --> E[Email Service]
-    C --> F[QR Code Generator]
-    C --> G[Attendance Forms]
+  WebApp[Web Dashboard] --> Form[Google Form]
+  Form --> AppScript[Google App Script]
+  Spreadsheet[Google Spreadsheet] --> AppScript
+  
+  subgraph Google App Script Workflow
+    AppScript --> Calendar[Google Calendar]
+    AppScript --> QR[QR Code Generator]
+    QR --> Email[Email Service]
+  end
+  
+  G[Attendance Forms]
 ```
 
-## ✨ Features
+## Features
+
+### 1. Web Dashboard
+
+```mermaid
+flowchart TD
+  Dashboard[Dashboard] --> NewUser{Register<br>New Member?}
+  NewUser --> |Yes| GoogleForm[Open Registration<br/>Google Form]
+  NewUser --> |No| ForgotPassword[Open<br>Forgot Password Page]
+  ForgotPassword --> Email[/Insert email/]
+  
+  Email --> checkEmail[GET Member from<br/>Spreadsheet]
+  checkEmail --> emailExists{Email exists?}
+
+  emailExists --> |Yes| sendQRcode[Send attendance<br/>QR code to email]
+  emailExists --> |No| displayNotFound[Display: User not found]
+  displayNotFound --> formSuggestion[Suggest: Open Registration<br/>Google Form]
+```
 
 ### Core Features
 
@@ -191,13 +213,14 @@ flowchart TD
 
 1. **Go to Google Forms**: Visit [forms.google.com](https://forms.google.com)
 2. **Create a new form** with the following fields:
+
    - **Full Name** (Short answer, Required)
    - **Email** (Email, Required)
    - **Birthday** (Date, Required)
    - **Phone Number** (Short answer, Optional)
    - **iCare Group** (Multiple choice, Optional)
-
 3. **Configure form settings**:
+
    - Enable "Collect email addresses"
    - Enable "Response receipts"
    - Set up response destination to Google Sheets
@@ -219,7 +242,6 @@ flowchart TD
 ```
 
 - Ganti URL form dan ID `entry` sesuai milik Anda.
-
 - Buat salinan untuk kolom QR Zhongli, ganti `Taipei` menjadi `Zhongli`.
 
 #### Langkah 4: Tambahkan Ulang Tahun ke Google Calendar (Apps Script)
@@ -297,19 +319,18 @@ To enable local development and syncing with Google Apps Script:
    ```
 
    (Find SCRIPT_ID in your Apps Script project URL)
-
 4. **Development workflow:**
 
    ```bash
    # Pull latest changes from cloud
    clasp pull
-   
+
    # Make your local changes
    # ...
-   
+
    # Push changes to cloud
    clasp push
-   
+
    # Open script in browser
    clasp open
    ```
@@ -525,7 +546,7 @@ function onFormSubmit(e) {
       console.log('Duplicate entry detected, skipping...');
       return;
     }
-    
+  
     processNewMember(formData);
   } catch (error) {
     console.error('Error in onFormSubmit:', error);
@@ -578,7 +599,7 @@ function extractFormData(e) {
   responses.forEach(response => {
     const title = response.getItem().getTitle();
     const value = response.getResponse();
-    
+  
     switch(title) {
       case CONFIG.FIELD_TITLES.ENGLISH_NAME:
         memberData.fullName = value;
@@ -695,9 +716,9 @@ const { title, description } = formatBirthdayEvent(member);
 
 - **Title**: `🎂 [English Name] ([Chinese Name])'s Birthday`
 - **Description**: Includes member details, birth year, email, and iCare group
-    throw error;
+  throw error;
   }
-}
+  }
 
 ```
 
@@ -743,10 +764,10 @@ function generateQRCodes(memberData) {
       `&entry.${getEntryId('email')}=${encodeURIComponent(memberData.email)}` +
       `&entry.${getEntryId('name')}=${encodeURIComponent(memberData.fullName)}` +
       `&entry.${getEntryId('location')}=${encodeURIComponent(location)}`;
-    
+  
     // Generate QR code URL
     const qrUrl = `${qrBaseUrl}?size=200x200&data=${encodeURIComponent(prefilledUrl)}`;
-    
+  
     qrCodes[location.toLowerCase()] = qrUrl;
   });
   
@@ -782,13 +803,13 @@ function generateQRCodes(memberData) {
 function sendWelcomeEmail(memberData, qrCodes) {
   try {
     const subject = `Welcome to Our Church Community! 🙏`;
-    
+  
     const htmlBody = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #2E7D32;">Welcome ${memberData.fullName}!</h2>
-        
+      
         <p>We're delighted to have you join our church community. Below are your personal QR codes for attendance tracking:</p>
-        
+      
         <div style="display: flex; justify-content: space-around; margin: 20px 0;">
           <div style="text-align: center;">
             <h3>Taipei Location</h3>
@@ -799,19 +820,19 @@ function sendWelcomeEmail(memberData, qrCodes) {
             <img src="${qrCodes.zhongli}" alt="Zhongli QR Code" style="width: 150px; height: 150px;">
           </div>
         </div>
-        
+      
         <p><strong>How to use:</strong> Simply show your QR code at check-in, or scan it yourself using the attendance tablets.</p>
-        
+      
         <hr style="margin: 30px 0;">
         <p style="color: #666; font-size: 14px;">
           If you need to update your information, you can use this link: 
           <a href="${memberData.editUrl}">Edit Your Response</a>
         </p>
-        
+      
         <p>God bless,<br>Church Admin Team</p>
       </div>
     `;
-    
+  
     // Send email
     GmailApp.sendEmail(
       memberData.email,
@@ -822,9 +843,9 @@ function sendWelcomeEmail(memberData, qrCodes) {
         name: 'Church Admin Team'
       }
     );
-    
+  
     console.log(`Welcome email sent to ${memberData.email}`);
-    
+  
   } catch (error) {
     console.error(`Failed to send welcome email to ${memberData.email}:`, error);
     throw error;
@@ -858,26 +879,26 @@ function isDuplicate(memberData) {
   try {
     const sheet = SpreadsheetApp.openById(CONFIG.SPREADSHEET.ID)
       .getSheetByName(CONFIG.SPREADSHEET.SHEET);
-    
+  
     const data = sheet.getDataRange().getValues();
     const headers = data[0];
-    
+  
     // Find email and phone columns
     const emailCol = headers.indexOf('Email') + 1;
     const phoneCol = headers.indexOf('Phone Number') + 1;
-    
+  
     // Check each row for duplicates
     for (let i = 1; i < data.length; i++) {
       const rowEmail = data[i][emailCol - 1];
       const rowPhone = data[i][phoneCol - 1];
-      
+    
       // Check for email match
       if (rowEmail && memberData.email && 
           rowEmail.toLowerCase() === memberData.email.toLowerCase()) {
         console.log(`Duplicate email found: ${memberData.email}`);
         return true;
       }
-      
+    
       // Check for phone match
       if (rowPhone && memberData.phone && 
           cleanPhoneNumber(rowPhone) === cleanPhoneNumber(memberData.phone)) {
@@ -885,9 +906,9 @@ function isDuplicate(memberData) {
         return true;
       }
     }
-    
+  
     return false;
-    
+  
   } catch (error) {
     console.error('Error checking for duplicates:', error);
     return false; // Allow processing if check fails
@@ -999,12 +1020,12 @@ clasp clone YOUR_SCRIPT_ID_HERE
 
 #### Required IDs to Configure
 
-| Variable | Description | How to Find |
-|----------|-------------|-------------|
-| `REGISTRATION_FORM_ID` | Google Form ID for member registration | Form URL: `forms.google.com/d/{FORM_ID}/edit` |
-| `ATTENDANCE_FORM_ID` | Google Form ID for attendance tracking | Form URL: `forms.google.com/d/{FORM_ID}/edit` |
-| `BIRTHDAY_CALENDAR_ID` | Google Calendar ID for birthdays | Calendar Settings → Calendar ID |
-| `SPREADSHEET.ID` | Google Sheets ID for form responses | Sheet URL: `docs.google.com/spreadsheets/d/{SHEET_ID}` |
+| Variable                 | Description                            | How to Find                                             |
+| ------------------------ | -------------------------------------- | ------------------------------------------------------- |
+| `REGISTRATION_FORM_ID` | Google Form ID for member registration | Form URL:`forms.google.com/d/{FORM_ID}/edit`          |
+| `ATTENDANCE_FORM_ID`   | Google Form ID for attendance tracking | Form URL:`forms.google.com/d/{FORM_ID}/edit`          |
+| `BIRTHDAY_CALENDAR_ID` | Google Calendar ID for birthdays       | Calendar Settings → Calendar ID                        |
+| `SPREADSHEET.ID`       | Google Sheets ID for form responses    | Sheet URL:`docs.google.com/spreadsheets/d/{SHEET_ID}` |
 
 #### Field Title Mapping
 
@@ -1153,12 +1174,12 @@ function notifyAdmin(error, context = '') {
   const subject = `🚨 Church Management System Error`;
   const body = `
     An error occurred in the Church Member Management System:
-    
+  
     Context: ${context}
     Error: ${error.message}
     Stack: ${error.stack}
     Time: ${new Date().toISOString()}
-    
+  
     Please check the Apps Script logs for more details.
   `;
   
@@ -1191,13 +1212,13 @@ function dailyHealthCheck() {
   try {
     // Check if services are accessible
     testPermissions();
-    
+  
     // Check recent form submissions
     const sheet = SpreadsheetApp.openById(CONFIG.SPREADSHEET.ID);
     const lastRow = sheet.getLastRow();
-    
+  
     console.log(`Health check passed. Total entries: ${lastRow - 1}`);
-    
+  
   } catch (error) {
     notifyAdmin(error, 'Daily Health Check');
   }
@@ -1233,7 +1254,6 @@ function dailyHealthCheck() {
    ```
 
 2. **Update field titles**: Ensure `CONFIG.FIELD_TITLES` exactly matches form field titles
-
 3. **Check form structure**: Verify form hasn't been modified since configuration
 
 #### Issue 3: QR codes not generating
@@ -1258,7 +1278,7 @@ function dailyHealthCheck() {
 **Solutions**:
 
 1. **Check Gmail quota**: Google Apps Script has daily email limits
-2. **Verify email addresses**: Ensure form collects valid email addresses  
+2. **Verify email addresses**: Ensure form collects valid email addresses
 3. **Test email function**:
 
    ```javascript
