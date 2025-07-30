@@ -32,21 +32,94 @@ This project demonstrates how to build a complete church member management syste
 - **Sends welcome emails** with personalized content
 - **Prevents duplicate** registrations
 
-### System Architecture
+## System Architecture
 
 ```mermaid
 graph TB
-  WebApp[Web Dashboard] --> Form[Google Form]
-  Form --> AppScript[Google App Script]
-  Spreadsheet[Google Spreadsheet] --> AppScript
+  dashboard[Google Site<br/>**Dashboard**] --> |GET MEMBER| AppScript[Google App Script<br/>API functions]
+  Form(Google Form<br/>**Registration**) --> |POST Member| AppScript
+  spreadsheet[Google spreadsheet<br/>**Member & Registration DB**] --> |READ Member| AppScript
+  attendanceForm[Google Form<br/>**Attendance Forms**] --> |SUBMIT Attendance| spreadsheet[Google spreadsheet<br/>**Member & Attendance DB**]
   
   subgraph Google App Script Workflow
-    AppScript --> Calendar[Google Calendar]
-    AppScript --> QR[QR Code Generator]
+    AppScript --> |CREATE Birthday| birthday[Google Calendar<br/>**Birthday**]
+    AppScript --> QR[QR Code Generator<br/>**Attendance QR code**]
+    AppScript --> |CREATE Member| spreadsheet
     QR --> Email[Email Service]
   end
-  
-  G[Attendance Forms]
+
+```
+
+## Class Diagram
+
+```mermaid
+classDiagram
+  class Member{
+    -String englishName
+    -String chineseName
+    -String email
+    -Date birthday
+    -String phone
+    -String iCare
+    -String editUrl
+    -QRcode attendaceQRcodes
+
+    -createMember(englishName: String, chineseName: String, email: String, birthday: Date, phone: String, iCare: String) Member
+    -readMember(email: String) Member
+    -updateMember(englishName: String, chineseName: String, email: String, birthday: Date, phone: String, iCare: String) Member
+    -deleteMember(email: String) Boolean
+
+    -readAttendanceQRcodes() QRcodes[]
+  }
+
+  class AttendanceQrCode{
+    -Member member
+    -Church church
+
+    - 
+  }
+
+  class EventReminder{
+    -int monthlyReminder
+    -int weeklyReminder
+    -int dailyReminder
+
+    -createEventReminder(int: monthly, int weekly, int daily) EventReminder
+    -readEventReminder() EventReminder
+    -updateEventReminder(int: monthly, int weekly, int daily) EventReminder
+    -deleteEventReminder() Boolean
+  }
+
+  class Church{
+    -String name
+    -String branch
+    -String abbreviation
+    -String mapUrl
+
+    -createChurch(String name, String branch, String abbreviation, String mapUrl) Church
+    -readChurch(String name, String branch) Church
+    -updateChurch(String name, String branch, String abbreviation, String mapUrl) Church
+    -deleteChurch(String name, String branch) Boolean
+  }
+
+  class Event{
+    -String title
+    -Date date
+    -String description
+    -int monthlyReminder
+    -int weeklyReminder
+    -int dailyReminder
+
+    -createEvent() Event
+    -readEvent() Event
+    -updateEvent(String title, Date date, String description) Event
+    -deleteEvent() Boolean
+  }
+
+  Member "1" --> "1" Event
+  Member "1" --> "* AttedanceQrCode
+  Member "1" --> "*" Attendance
+  Event "1" --> "1" EventReminder
 ```
 
 ## Features
@@ -60,7 +133,7 @@ flowchart TD
   NewUser --> |No| ForgotPassword[Open<br>Forgot Password Page]
   ForgotPassword --> Email[/Insert email/]
   
-  Email --> checkEmail[GET Member from<br/>Spreadsheet]
+  Email --> checkEmail[GET Member from<br/>spreadsheet]
   checkEmail --> emailExists{Email exists?}
 
   emailExists --> |Yes| sendQRcode[Send attendance<br/>QR code to email]
@@ -92,7 +165,7 @@ flowchart TD
 - **🗂️ Modular Architecture**: Separated birthday logic into dedicated `development/calendar.js` module
 - **🔗 Combined Functions**: Merged `formatBirthdayEventTitle` and `formatBirthdayEventDescription` into single `formatBirthdayEvent()` function
 - **🧹 Code Cleanup**: Removed unnecessary utility functions, reduced calendar.js from 487 to 148 lines (69% reduction)
-- **📊 Spreadsheet-First**: Duplicate checking now handled via spreadsheet rather than calendar events
+- **📊 spreadsheet-First**: Duplicate checking now handled via spreadsheet rather than calendar events
 - **⚡ Performance**: Streamlined birthday creation workflow with better error handling
 
 ### 🛠️ Technical Improvements
@@ -196,7 +269,7 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A((Start)) --> B[Retrieve data from Google Spreadsheet]
+    A((Start)) --> B[Retrieve data from Google spreadsheet]
     B --> C{Is data already processed?}
     C -- Yes --> H((Complete))
     C -- No --> D[Extract Name, Email, Birthday]
@@ -248,7 +321,7 @@ flowchart TD
 
 ```javascript
 function addToCalendar() {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Form Responses 1");
+  const sheet = spreadsheetApp.getActivespreadsheet().getSheetByName("Form Responses 1");
   const calendar = CalendarApp.getCalendarById("your_calendar_id@group.calendar.google.com");
 
   const data = sheet.getDataRange().getValues();
@@ -264,7 +337,7 @@ function addToCalendar() {
 
 ```javascript
 function sendWelcomeEmails() {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Form Responses 1");
+  const sheet = spreadsheetApp.getActivespreadsheet().getSheetByName("Form Responses 1");
   const data = sheet.getDataRange().getValues();
   
   for (let i = 1; i < data.length; i++) {
@@ -371,8 +444,8 @@ const CONFIG = {
   REGISTRATION_FORM_ID: 'your-form-id',
   BIRTHDAY_CALENDAR_ID: 'your-calendar-id',
   
-  // Spreadsheet Configuration
-  SPREADSHEET: {
+  // spreadsheet Configuration
+  spreadsheet: {
     ID: 'your-spreadsheet-id',
     SHEET: 'Sheet1' // or your sheet name
   },
@@ -487,8 +560,8 @@ const CONFIG = {
   ATTENDANCE_FORM_ID: 'your-attendance-form-id-here', 
   BIRTHDAY_CALENDAR_ID: 'your-calendar-id@group.calendar.google.com',
   
-  // Spreadsheet Configuration
-  SPREADSHEET: {
+  // spreadsheet Configuration
+  spreadsheet: {
     ID: 'your-spreadsheet-id-here',
     SHEET: 'Form Responses 1'
   },
@@ -877,8 +950,8 @@ function sendWelcomeEmail(memberData, qrCodes) {
  */
 function isDuplicate(memberData) {
   try {
-    const sheet = SpreadsheetApp.openById(CONFIG.SPREADSHEET.ID)
-      .getSheetByName(CONFIG.SPREADSHEET.SHEET);
+    const sheet = spreadsheetApp.openById(CONFIG.spreadsheet.ID)
+      .getSheetByName(CONFIG.spreadsheet.SHEET);
   
     const data = sheet.getDataRange().getValues();
     const headers = data[0];
@@ -1025,7 +1098,7 @@ clasp clone YOUR_SCRIPT_ID_HERE
 | `REGISTRATION_FORM_ID` | Google Form ID for member registration | Form URL:`forms.google.com/d/{FORM_ID}/edit`          |
 | `ATTENDANCE_FORM_ID`   | Google Form ID for attendance tracking | Form URL:`forms.google.com/d/{FORM_ID}/edit`          |
 | `BIRTHDAY_CALENDAR_ID` | Google Calendar ID for birthdays       | Calendar Settings → Calendar ID                        |
-| `SPREADSHEET.ID`       | Google Sheets ID for form responses    | Sheet URL:`docs.google.com/spreadsheets/d/{SHEET_ID}` |
+| `spreadsheet.ID`       | Google Sheets ID for form responses    | Sheet URL:`docs.google.com/spreadsheets/d/{SHEET_ID}` |
 
 #### Field Title Mapping
 
@@ -1119,7 +1192,7 @@ clasp open
 // Run this to test all permissions
 function testPermissions() {
   console.log('Testing Sheets access...');
-  const sheet = SpreadsheetApp.openById(CONFIG.SPREADSHEET.ID);
+  const sheet = spreadsheetApp.openById(CONFIG.spreadsheet.ID);
   console.log('✅ Sheets access OK');
   
   console.log('Testing Calendar access...');
@@ -1214,7 +1287,7 @@ function dailyHealthCheck() {
     testPermissions();
   
     // Check recent form submissions
-    const sheet = SpreadsheetApp.openById(CONFIG.SPREADSHEET.ID);
+    const sheet = spreadsheetApp.openById(CONFIG.spreadsheet.ID);
     const lastRow = sheet.getLastRow();
   
     console.log(`Health check passed. Total entries: ${lastRow - 1}`);
