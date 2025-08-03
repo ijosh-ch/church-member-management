@@ -6,20 +6,93 @@
 
 A comprehensive tutorial and implementation guide for building an automated church member management system using Google Forms, Google Sheets, and Google Apps Script.
 
-## 📚 Table of Contents
+## Table of Contents
 
-- [Overview](#overview)
-- [Features](#-features)
-- [Recent Updates (July 2025)](#-recent-updates-july-2025)
-- [Prerequisites](#-prerequisites)
-- [Quick Start](#-quick-start)
-- [Tutorial](#-tutorial)
-- [API Documentation](#-api-documentation)
-- [Configuration](#️-configuration)
-- [Deployment](#-deployment)
-- [Troubleshooting](#-troubleshooting)
-- [Contributing](#-contributing)
-- [License](#-license)
+- [Church Member Management System Tutorial](#church-member-management-system-tutorial)
+  - [Table of Contents](#table-of-contents)
+  - [Overview](#overview)
+  - [Use Case Diagram](#use-case-diagram)
+  - [System Architecture](#system-architecture)
+  - [Class Diagram](#class-diagram)
+  - [Features](#features)
+    - [1. Web Dashboard](#1-web-dashboard)
+    - [2. Add Calendar](#2-add-calendar)
+    - [Core Features](#core-features)
+    - [Advanced Features](#advanced-features)
+  - [🔄 Recent Updates (July 2025)](#-recent-updates-july-2025)
+    - [⚡ Calendar Module Refactoring](#-calendar-module-refactoring)
+    - [🛠️ Technical Improvements](#️-technical-improvements)
+  - [📋 Prerequisites](#-prerequisites)
+    - [Required Knowledge](#required-knowledge)
+    - [Required Tools](#required-tools)
+    - [Optional but Recommended](#optional-but-recommended)
+  - [🚀 Quick Start](#-quick-start)
+    - [1. Clone and Setup](#1-clone-and-setup)
+    - [2. Configure Your Project](#2-configure-your-project)
+    - [3. Test the System](#3-test-the-system)
+  - [📖 Tutorial](#-tutorial)
+    - [Chapter 1: Understanding the System](#chapter-1-understanding-the-system)
+      - [1.1 What We're Building](#11-what-were-building)
+      - [1.2 System Workflow](#12-system-workflow)
+      - [1.3 Detailed Processing Flow](#13-detailed-processing-flow)
+    - [Chapter 2: Step-by-Step Implementation](#chapter-2-step-by-step-implementation)
+      - [Step 1: Create Google Form](#step-1-create-google-form)
+      - [Step 2: Connect to Google Sheets](#step-2-connect-to-google-sheets)
+      - [Step 3: Set Up Google Apps Script](#step-3-set-up-google-apps-script)
+      - [Langkah 4: Tambahkan Ulang Tahun ke Google Calendar (Apps Script)](#langkah-4-tambahkan-ulang-tahun-ke-google-calendar-apps-script)
+      - [Langkah 5: Kirim Email Selamat Datang dengan QR Code](#langkah-5-kirim-email-selamat-datang-dengan-qr-code)
+    - [2.3 Configuration \& Setup](#23-configuration--setup)
+      - [2.3.1 Local Development with Clasp](#231-local-development-with-clasp)
+      - [2.3.2 Project Structure](#232-project-structure)
+      - [2.3.3 Configuration Setup](#233-configuration-setup)
+      - [2.3.4 Dynamic Field Mapping](#234-dynamic-field-mapping)
+      - [2.3.5 New Features](#235-new-features)
+    - [2.4 Implementasi Kode](#24-implementasi-kode)
+      - [Step 4: Configure the System](#step-4-configure-the-system)
+      - [Step 5: Implement Core Functions](#step-5-implement-core-functions)
+      - [Step 6: Set Up Automation](#step-6-set-up-automation)
+  - [📊 API Documentation](#-api-documentation)
+    - [Core Functions](#core-functions)
+      - [`onFormSubmit(e)`](#onformsubmite)
+      - [`extractFormData(e)`](#extractformdatae)
+      - [`addBirthdayToCalendar(member)` - Calendar Module](#addbirthdaytocalendarmember---calendar-module)
+      - [`formatBirthdayEvent(member)` - Calendar Module](#formatbirthdayeventmember---calendar-module)
+      - [`sendWelcomeEmail(memberData, qrCodes)`](#sendwelcomeemailmemberdata-qrcodes)
+      - [`isDuplicate(memberData)`](#isduplicatememberdata)
+    - [Utility Functions](#utility-functions)
+      - [`cleanPhoneNumber(phone)`](#cleanphonenumberphone)
+      - [`getEntryId(fieldName)`](#getentryidfieldname)
+      - [`notifyAdmin(error)`](#notifyadminerror)
+  - [⚙️ Configuration](#️-configuration)
+    - [Environment Setup](#environment-setup)
+      - [1. Local Development Setup](#1-local-development-setup)
+      - [2. Project Configuration](#2-project-configuration)
+    - [Configuration Variables](#configuration-variables)
+      - [Required IDs to Configure](#required-ids-to-configure)
+      - [Field Title Mapping](#field-title-mapping)
+    - [Testing Configuration](#testing-configuration)
+  - [🚀 Deployment](#-deployment)
+    - [Step 1: Prepare for Deployment](#step-1-prepare-for-deployment)
+    - [Step 2: Set Up Permissions](#step-2-set-up-permissions)
+    - [Step 3: Create Form Submission Trigger](#step-3-create-form-submission-trigger)
+    - [Step 4: Set Up Error Monitoring](#step-4-set-up-error-monitoring)
+    - [Step 5: Production Monitoring](#step-5-production-monitoring)
+  - [🐛 Troubleshooting](#-troubleshooting)
+    - [Common Issues and Solutions](#common-issues-and-solutions)
+      - [Issue 1: "Permission denied" errors](#issue-1-permission-denied-errors)
+      - [Issue 2: Form fields not mapping correctly](#issue-2-form-fields-not-mapping-correctly)
+      - [Issue 3: QR codes not generating](#issue-3-qr-codes-not-generating)
+      - [Issue 4: Emails not sending](#issue-4-emails-not-sending)
+      - [Issue 5: Duplicate detection not working](#issue-5-duplicate-detection-not-working)
+    - [Debug Mode](#debug-mode)
+    - [Getting Help](#getting-help)
+  - [🤝 Contributing](#-contributing)
+    - [How to Contribute](#how-to-contribute)
+    - [Coding Standards](#coding-standards)
+    - [Feature Requests](#feature-requests)
+  - [📄 License](#-license)
+  - [🙏 Acknowledgments](#-acknowledgments)
+
 
 ## Overview
 
@@ -32,6 +105,24 @@ This project demonstrates how to build a complete church member management syste
 - **Sends welcome emails** with personalized content
 - **Prevents duplicate** registrations
 
+## Use Case Diagram
+
+```mermaid
+graph LR
+Actor[Member] --> Register
+Actor --> ForgetQRcode
+
+  subgraph Church Member Management System
+    ForgetQRcode([Forget QR Code]) --> |include| emailQR
+
+    Register([Register New Member]) --> |include| AddBirthday([Add Birthday to Calendar])
+    Register --> |include| emailQR([Send QR Code to Email])
+      emailQR --> |include| generateQR([Generate QR Code])
+
+    Register --> |include| addEditURL([Add Edit URL to Spreadsheet])
+  end
+```
+
 ## System Architecture
 
 ```mermaid
@@ -43,9 +134,7 @@ graph TB
   
   subgraph Google App Script Workflow
     AppScript --> |CREATE Birthday| birthday[Google Calendar<br/>**Birthday**]
-    AppScript --> QR[QR Code Generator<br/>**Attendance QR code**]
     AppScript --> |CREATE Member| spreadsheet
-    QR --> Email[Email Service]
   end
 
 ```
@@ -54,106 +143,42 @@ graph TB
 
 ```mermaid
 classDiagram
-  class Member {
-    -String englishName
-    -String chineseName
-    -String email
-    -Date birthday
-    -String phone
-    -iCareGroup iCare
-    -String editUrl
-    -QRCode[] attendanceQRCodes
 
-    +create(formResponse): Member
-    +read(email: String): Member
-    +update(formResponse): Member
-    +delete(email: String): Boolean
-    +readAttendanceQRCodes(email: String): QRCode[]
-  }
+class Member{
+  - String englishName
+  - String chineseName
+  - String email
+  - Date birthday
+  - String phone
+  - String iCare
+  - String editUrl
+}
 
+class Calendar{
+  - String title
+  - Date date
+  - String description
 
+  + createEvent(title: String, date: Date, description: String): void
+}
 
-  class AttendanceFieldsID {
-    -String formID
-    -String email
-    -String fullName
-    -String iCare
-    -String location
+class AttendanceFormFieldsID{
+  - String email
+  - String name
+  - String iCare
+  - String location
+}
 
-    -create(formID: String): AttendanceFieldsID
-    -get(formID: String): AttendanceFieldsID
-  }
+class QRcode{
+  - Member member
+  - String formURL
+  - AttendanceFormFieldsID fieldsID
 
-  class AttendanceQRCode {
-    -AttendanceFieldsID AttendanceFieldsID
-    -Church church
-    -String qrCodeUrl
+  - createQRcode(fieldsID: AttendanceFormFieldsID, member: Member): QRcode
+}
 
-    +create(fieldsID: AttendanceFieldsID, location: ChurchLocation): AttendanceQRCode
-  }
-
-  class EventReminder {
-    -int monthlyReminder
-    -int weeklyReminder
-    -int dailyReminder
-
-    +create(monthly: int, weekly: int, daily: int): EventReminder
-    +read(): EventReminder
-    +update(monthly: int, weekly: int, daily: int): EventReminder
-    +delete(): Boolean
-  }
-
-  class Church {
-    -String name
-    -String branch
-    -String abbreviation
-    -String mapUrl
-    -ChurchLocation location
-
-    +create(name: String, branch: String, abbreviation: String, mapUrl: String, location: ChurchLocation): Church
-    +read(name: String, branch: String): Church
-    +update(name: String, branch: String, abbreviation: String, mapUrl: String): Church
-    +delete(name: String, branch: String): Boolean
-  }
-
-  class Event {
-    -String title
-    -Date date
-    -String description
-    -EventReminder reminder
-
-    +create(): Event
-    +read(): Event
-    +update(title: String, date: Date, description: String): Event
-    +delete(): Boolean
-  }
-
-  class LocationEnum {
-    <<enumeration>>
-    TAIPEI
-    ZHONGLI
-  }
-
-  class AttendanceFormFieldsEnum{
-    <<enumeration>>
-    -String formID
-    -String email
-    -String fullName
-    -String iCare
-    -String location
-  }
-
-  Member "1" --> "1" Event : has birthday
-  Member "1" --> "*" AttendanceQRCode : generates
-  Member "1" --> "*" Attendance : records
-  Event "1" --> "1" EventReminder : contains
-  AttendanceQRCode "*" --> "1" Church : for location
-  Attendance "*" --> "1" Church : at location
-  
-  Member --> iCareGroup : belongs to
-  Church --> ChurchLocation : located at
-  Attendance --> ChurchLocation : recorded at
-  EventReminder --> ReminderType : uses
+QRcode "1" --> "1" Member : includes
+QRcode "1" --> "1" AttendanceFormFieldsID : includes
 ```
 
 ## Features
@@ -162,8 +187,9 @@ classDiagram
 
 ```mermaid
 flowchart TD
-  Dashboard[Dashboard] --> NewUser{Register<br>New Member?}
+  START((START)) --> NewUser{Register<br>New Member?}
   NewUser --> |Yes| GoogleForm[Open Registration<br/>Google Form]
+  GoogleForm --> END
   NewUser --> |No| ForgotPassword[Open<br>Forgot Password Page]
   ForgotPassword --> Email[/Insert email/]
   
@@ -171,8 +197,33 @@ flowchart TD
   checkEmail --> emailExists{Member is exists}
 
   emailExists --> |Yes| sendQRcode[Send attendance<br/>QR code to email]
-  emailExists --> |No| displayNotFound[Display: User not found]
+  emailExists --> |No| displayNotFound[\Display: User not found\]
   displayNotFound --> formSuggestion[Suggest: Open Registration<br/>Google Form]
+  formSuggestion --> GoogleForm
+
+  sendQRcode --> END((END))
+```
+
+### 2. Add Calendar
+
+```mermaid
+flowchart TD
+    START((START)) --> CalendarID[Set Calendar by ID]
+    CalendarID --> CheckCalendar{Calendar Exists?}
+    
+    CheckCalendar -->|No| RepeatAnnually[Create Annual Recurrence Event]
+    CheckCalendar -->|Yes| E[Throw Error: Calendar Not Found]
+    
+    RepeatAnnually --> F[Set Event Title & Description]
+    F --> G[Create All-Day Event Series]
+    
+    G --> H[Add 1-Week Reminder]
+    H --> I[Add 1-Day Reminder]
+    I --> J[Log Success]
+    
+    E --> K[Log Error]
+    J --> L([End])
+    K --> L
 ```
 
 ### Core Features
