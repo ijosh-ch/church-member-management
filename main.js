@@ -23,13 +23,20 @@
  * @param {GoogleAppsScript.Events.FormsOnFormSubmit} e The event object from the form trigger.
  */
 function onFormSubmit(e) {
+  // Gracefully handle manual execution from the script editor
+  if (!e || !e.response) {
+    Logger.log('🛑 This function is designed to be triggered by a form submission and cannot be run directly.');
+    Logger.log('💡 To test, please submit a real form response or run a dedicated test function that provides a mock event object.');
+    return; // Exit gracefully
+  }
+
   try {
     Logger.log('🚀 Form submission triggered - starting processing...');
-    
+
     // STEP 1: Always add edit response URL first (for all submissions)
     Logger.log('📝 Step 1: Adding edit response URL to spreadsheet...');
     addEditResponseUrlToSpreadsheet(e.response);
-    
+
     // STEP 2: Extract member details from response
     Logger.log('📋 Step 2: Extracting member details from form response...');
     const member = getMemberDetailsFromResponse(e.response);
@@ -38,7 +45,7 @@ function onFormSubmit(e) {
     // STEP 3: Check if member already exists in spreadsheet
     Logger.log('🔍 Step 3: Checking if member already exists...');
     const memberExists = checkIfMemberExists(member);
-    
+
     if (memberExists) {
       Logger.log(`⚠️ Member ${member.englishName} (${member.email}) already exists in spreadsheet. Skipping birthday calendar addition.`);
     } else {
@@ -50,7 +57,7 @@ function onFormSubmit(e) {
     // STEP 5: Generate QR codes for attendance (always done for both new and existing members)
     Logger.log('🔗 Step 5: Generating QR codes...');
     const qrCodeBlobs = generateQRCodeBlobs(member);
-    
+
     // STEP 6: Send welcome email with QR codes
     Logger.log('📧 Step 6: Sending welcome email with QR codes...');
     sendQRCodesByEmail(member, qrCodeBlobs);
@@ -97,37 +104,29 @@ function addBirthdayToCalendar(member) {
  */
 function generateQRCodeBlobs(member) {
   const qrApiBaseUrl = "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=";
-  
+
   // Build URL with available entry IDs
   let basePrefilledUrl = `${ATTENDANCE_FORM.url}?usp=pp_url`;
-  
-  const emailEntryId = getEntryId('EMAIL');
-  const phoneEntryId = getEntryId('PHONE');
-  const nameEntryId = getEntryId('FULL_NAME');
-  const icareEntryId = getEntryId('ICARE');
-  const locationEntryId = getEntryId('LOCATION');
-  
-  // Only add parameters if we have valid entry IDs
-  if (emailEntryId) {
-    basePrefilledUrl += `&${emailEntryId}=${encodeURIComponent(member.email)}`;
+
+  // Only add parameters if we have valid entry IDs and values
+  if (member.email) {
+    basePrefilledUrl += `&entry.${ATTENDANCE_FORM.fields_id.EMAIL}=${encodeURIComponent(member.email)}`;
   }
-  if (phoneEntryId && member.phone) {
-    basePrefilledUrl += `&${phoneEntryId}=${encodeURIComponent(member.phone)}`;
+  if (member.phone) {
+    basePrefilledUrl += `&entry.${ATTENDANCE_FORM.fields_id.PHONE}=${encodeURIComponent(member.phone)}`;
   }
-  if (nameEntryId) {
-    basePrefilledUrl += `&${nameEntryId}=${encodeURIComponent(member.englishName)}`;
+  if (member.englishName) {
+    basePrefilledUrl += `&entry.${ATTENDANCE_FORM.fields_id.FULL_NAME}=${encodeURIComponent(member.englishName)}`;
   }
-  if (icareEntryId) {
-    basePrefilledUrl += `&${icareEntryId}=${encodeURIComponent(member.iCare)}`;
+  if (member.iCare) {
+    basePrefilledUrl += `&entry.${ATTENDANCE_FORM.fields_id.ICARE}=${encodeURIComponent(member.iCare)}`;
   }
 
   // Add location-specific URLs
-  const prefilledUrlTaipei = locationEntryId ? 
-    `${basePrefilledUrl}&${locationEntryId}=Taipei` : basePrefilledUrl;
-  const prefilledUrlZhongli = locationEntryId ? 
-    `${basePrefilledUrl}&${locationEntryId}=Zhongli` : basePrefilledUrl;
-
-  const qrCodeUrlTaipei = qrApiBaseUrl + encodeURIComponent(prefilledUrlTaipei);
+  const prefilledUrlTaipei = ATTENDANCE_FORM.fields_id.LOCATION ? 
+    `${basePrefilledUrl}&entry.${ATTENDANCE_FORM.fields_id.LOCATION}=Taipei` : basePrefilledUrl;
+  const prefilledUrlZhongli = ATTENDANCE_FORM.fields_id.LOCATION ? 
+    `${basePrefilledUrl}&entry.${ATTENDANCE_FORM.fields_id.LOCATION}=Zhongli` : basePrefilledUrl;  const qrCodeUrlTaipei = qrApiBaseUrl + encodeURIComponent(prefilledUrlTaipei);
   const qrCodeUrlZhongli = qrApiBaseUrl + encodeURIComponent(prefilledUrlZhongli);
 
   // Fetch both blobs concurrently for a minor speed improvement
@@ -140,8 +139,13 @@ function generateQRCodeBlobs(member) {
   }];
   const responses = UrlFetchApp.fetchAll(requests);
 
-  const qrCodeBlobTaipei = responses[0].getBlob().setName(`QRCode_Taipei_${member.englishName}.png`);
-  const qrCodeBlobZhongli = responses[1].getBlob().setName(`QRCode_Zhongli_${member.englishName}.png`);
+  // Check if QR code generation was successful
+  if (responses[0].getResponseCode() !== 200 || responses[1].getResponseCode() !== 200) {
+    throw new Error(`QR code generation failed. Taipei: ${responses[0].getResponseCode()}, Zhongli: ${responses[1].getResponseCode()}`);
+  }
+
+  const qrCodeBlobTaipei = responses[0].getBlob().setName(`QRCode_Taipei_${member.englishName.replace(/[^a-zA-Z0-9]/g, '_')}.png`);
+  const qrCodeBlobZhongli = responses[1].getBlob().setName(`QRCode_Zhongli_${member.englishName.replace(/[^a-zA-Z0-9]/g, '_')}.png`);
 
   Logger.log(`✅ Generated QR code blobs for ${member.englishName}.`);
   return {
@@ -180,13 +184,13 @@ function sendQRCodesByEmail(member, qrCodeBlobs) {
 // --- 4. HELPER FUNCTIONS ---
 
 /**
- * Adds the edit response URL to the first column of the spreadsheet for the latest response.
+ * Adds the edit response URL to column A of the spreadsheet for the latest response.
  * @param {GoogleAppsScript.Forms.FormResponse} response The form response object.
  */
 function addEditResponseUrlToSpreadsheet(response) {
   try {
     const editUrl = response.getEditResponseUrl();
-    
+
     // Get the spreadsheet - use configured ID or active spreadsheet
     let spreadsheet;
     if (SPREADSHEET.id) {
@@ -194,40 +198,30 @@ function addEditResponseUrlToSpreadsheet(response) {
     } else {
       spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
     }
-    
+
     const sheet = spreadsheet.getSheetByName(SPREADSHEET.sheets[0]);
     if (!sheet) {
       Logger.log(`⚠️ Could not find ${SPREADSHEET.sheets[0]} sheet. Skipping edit URL addition.`);
       return;
     }
-    
+
     // Find the row corresponding to this response (usually the last row with data)
     const lastRow = sheet.getLastRow();
-    const numColumns = sheet.getLastColumn();
+
+    // Check if column A header exists and set it if not
+    const headerCell = sheet.getRange(1, 1); // Column A, Row 1
+    const currentHeader = headerCell.getValue();
     
-    // Check if there's already an "Edit URL" column header
-    const headerRow = 1;
-    const headers = sheet.getRange(headerRow, 1, 1, numColumns).getValues()[0];
-    
-    let editUrlColumn = -1;
-    for (let i = 0; i < headers.length; i++) {
-      if (headers[i] && headers[i].toString().toLowerCase().includes('edit')) {
-        editUrlColumn = i + 1; // Convert to 1-based index
-        break;
-      }
+    if (!currentHeader || !currentHeader.toString().toLowerCase().includes('edit')) {
+      // Set the header for column A if it doesn't exist or isn't related to edit URL
+      headerCell.setValue('Edit Response URL');
+      Logger.log(`📝 Set column A header to "Edit Response URL"`);
     }
-    
-    // If no edit URL column exists, create one at the end
-    if (editUrlColumn === -1) {
-      editUrlColumn = numColumns + 1;
-      sheet.getRange(headerRow, editUrlColumn).setValue('Edit Response URL');
-      Logger.log(`📝 Created new "Edit Response URL" column at column ${editUrlColumn}`);
-    }
-    
-    // Insert the edit URL in the appropriate column of the latest response
-    sheet.getRange(lastRow, editUrlColumn).setValue(editUrl);
-    
-    Logger.log(`✅ Added edit response URL to spreadsheet row ${lastRow}, column ${editUrlColumn}.`);
+
+    // Insert the edit URL in column A of the latest response row
+    sheet.getRange(lastRow, 1).setValue(editUrl); // Column A = 1
+
+    Logger.log(`✅ Added edit response URL to spreadsheet row ${lastRow}, column A.`);
   } catch (error) {
     Logger.log(`⚠️ Could not add edit response URL to spreadsheet: ${error.message}`);
     // Does not throw error to allow rest of script to run.
@@ -246,16 +240,16 @@ function getColumnIndexForFieldTitle(fieldTitle) {
       // No separate email field, use auto-collected email (column 1)
       return 1;
     }
-    
+
     const fieldId = getFieldIdByTitle(fieldTitle);
     if (!fieldId) {
       Logger.log(`⚠️ Field with title "${fieldTitle}" not found in form.`);
       return -1;
     }
-    
+
     const form = FormApp.openById(REGISTRATION_FORM.id);
     const items = form.getItems();
-    
+
     // Find the position of the field in the form
     let fieldPosition = -1;
     for (let i = 0; i < items.length; i++) {
@@ -264,27 +258,27 @@ function getColumnIndexForFieldTitle(fieldTitle) {
         break;
       }
     }
-    
+
     if (fieldPosition === -1) {
       Logger.log(`⚠️ Field ID ${fieldId} not found in form.`);
       return -1;
     }
-    
+
     // In Google Forms spreadsheet, columns are:
     // Column 0: Timestamp
     // Column 1: Email (if collecting emails automatically)
     // Column 2+: Form fields in order
-    
+
     // Adjust for timestamp column (always first) and email column (if enabled)
     const form_collects_email = true; // Set to false if your form doesn't collect emails automatically
     let columnIndex = 1; // Start after timestamp
-    
+
     if (form_collects_email) {
       columnIndex++; // Skip email column
     }
-    
+
     columnIndex += fieldPosition; // Add field position
-    
+
     return columnIndex;
   } catch (error) {
     Logger.log(`⚠️ Error getting column index for field "${fieldTitle}": ${error.message}`);
@@ -307,31 +301,31 @@ function checkIfMemberExists(member) {
     } else {
       spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
     }
-    
+
     const sheet = spreadsheet.getSheetByName(SPREADSHEET.sheets[0]);
     if (!sheet) {
       Logger.log(`⚠️ Could not find '${SPREADSHEET.sheets[0]}' sheet. Assuming member doesn't exist.`);
       return false;
     }
-    
+
     const data = sheet.getDataRange().getValues();
-    
+
     // Get column indices and check if fields are required
     const emailColumnIndex = getColumnIndexForFieldTitle(REGISTRATION_FORM.fields.EMAIL);
     const phoneColumnIndex = getColumnIndexForFieldTitle(REGISTRATION_FORM.fields.PHONE);
-    
+
     // Check if fields are required (only check required fields for uniqueness)
     const emailIsRequired = (!REGISTRATION_FORM.fields.EMAIL || REGISTRATION_FORM.fields.EMAIL.trim() === '') || isFieldRequiredByTitle(REGISTRATION_FORM.fields.EMAIL) || emailColumnIndex === 1; // Email is always required if auto-collected
     const phoneIsRequired = isFieldRequiredByTitle(REGISTRATION_FORM.fields.PHONE);
-    
+
     Logger.log(`Field requirement status - Email required: ${emailIsRequired}, Phone required: ${phoneIsRequired}`);
     Logger.log(`Column indices - Email: ${emailColumnIndex}, Phone: ${phoneColumnIndex}`);
     Logger.log(`Member data - Email: "${member.email}", Phone: "${member.phone}"`);
-    
+
     // Check each row (skip header row)
     for (let i = 1; i < data.length; i++) {
       const row = data[i];
-      
+
       // Check email uniqueness only if email field is required and member has email
       if (emailIsRequired && emailColumnIndex !== -1 && member.email) {
         const rowEmail = row[emailColumnIndex] ? row[emailColumnIndex].toString().trim() : '';
@@ -340,31 +334,31 @@ function checkIfMemberExists(member) {
           return true;
         }
       }
-      
+
       // Check phone uniqueness only if phone field is required and member has phone
       if (phoneIsRequired && phoneColumnIndex !== -1 && member.phone) {
         const rowPhone = row[phoneColumnIndex] ? row[phoneColumnIndex].toString().trim() : '';
         const cleanedRowPhone = cleanPhoneNumber(rowPhone);
         const cleanedMemberPhone = cleanPhoneNumber(member.phone);
-        
+
         if (cleanedRowPhone && cleanedMemberPhone && cleanedRowPhone === cleanedMemberPhone) {
           Logger.log(`Found existing member with phone: ${member.phone} → ${cleanedMemberPhone} (Phone field is required - enforcing uniqueness)`);
           return true;
         }
       }
     }
-    
+
     // Log what was checked for debugging
     const checkedFields = [];
     if (emailIsRequired && member.email) checkedFields.push('email');
     if (phoneIsRequired && member.phone) checkedFields.push('phone');
-    
+
     if (checkedFields.length > 0) {
       Logger.log(`✅ No duplicate found. Checked uniqueness for required fields: ${checkedFields.join(', ')}`);
     } else {
       Logger.log(`ℹ️ No required fields to check for uniqueness (or member missing required field values)`);
     }
-    
+
     return false;
   } catch (error) {
     Logger.log(`⚠️ Error checking if member exists: ${error.message}. Assuming member doesn't exist.`);
@@ -395,13 +389,13 @@ function getMemberDetailsFromResponse(response) {
 
   const itemResponses = response.getItemResponses();
   Logger.log(`Processing ${itemResponses.length} form responses...`);
-  
+
   for (const itemResponse of itemResponses) {
     const questionTitle = itemResponse.getItem().getTitle().trim();
     const answer = itemResponse.getResponse();
-    
+
     Logger.log(`Field: "${questionTitle}" = "${answer}"`);
-    
+
     if (!answer) continue; // Skip unanswered questions
 
     // Match field titles from CONFIG (using more flexible matching)
@@ -467,7 +461,7 @@ function createWelcomeEmailHtml(member) {
             <h3>IFGF Taipei</h3>
             <img src="cid:taipeiQr" alt="IFGF Taipei QR Code" style="width:300px; height:300px; max-width: 100%;">
             <p style="font-size: 0.9em; margin-top: 10px;">
-              <strong>Lokasi:</strong> <a href="${CHURCH.branches.find(b => b.name === 'Taipei')?.gmaps}">Buka di Google Maps</a>
+              <strong>Lokasi:</strong> <a href="${CHURCH.branches.find(b => b.name === 'Taipei')?.gmaps || '#'}">Buka di Google Maps</a>
             </p>
           </div>
           
@@ -475,7 +469,7 @@ function createWelcomeEmailHtml(member) {
             <h3>IFGF Zhongli</h3>
             <img src="cid:zhongliQr" alt="IFGF Zhongli QR Code" style="width:300px; height:300px; max-width: 100%;">
             <p style="font-size: 0.9em; margin-top: 10px;">
-              <strong>Lokasi:</strong> <a href="${CHURCH.branches.find(b => b.name === 'Zhongli')?.gmaps}">Buka di Google Maps</a>
+              <strong>Lokasi:</strong> <a href="${CHURCH.branches.find(b => b.name === 'Zhongli')?.gmaps || '#'}">Buka di Google Maps</a>
             </p>
           </div>
         </div>
@@ -497,27 +491,27 @@ function logQuestionIDs() {
     const form = FormApp.openById(REGISTRATION_FORM.id);
     const items = form.getItems();
     Logger.log('--- Registration Form Question IDs ---');
-    
+
     const configuredTitles = Object.values(REGISTRATION_FORM.fields);
-    
+
     items.forEach(item => {
       const title = item.getTitle();
       const id = item.getId();
-      const isConfigured = configuredTitles.some(configTitle => 
+      const isConfigured = configuredTitles.some(configTitle =>
         title.toLowerCase() === configTitle.toLowerCase()
       );
-      
+
       Logger.log(`Title: "${title}" | ID: ${id} ${isConfigured ? '✅ CONFIGURED' : ''}`);
     });
-    
+
     Logger.log('--- Configured Field Status ---');
     Object.entries(REGISTRATION_FORM.fields).forEach(([key, title]) => {
-      const found = items.some(item => 
+      const found = items.some(item =>
         item.getTitle().toLowerCase() === title.toLowerCase()
       );
       Logger.log(`${key}: "${title}" ${found ? '✅ FOUND' : '❌ NOT FOUND'}`);
     });
-    
+
     Logger.log('------------------------------------');
   } catch (e) {
     Logger.log(`Error: Could not open form with ID "${REGISTRATION_FORM.id}". Please check the ID in the config.js object.`)
@@ -534,20 +528,20 @@ function isFieldRequiredByTitle(fieldTitle) {
     if (!fieldTitle || fieldTitle.trim() === '') {
       return false; // Auto-collected fields (like email) are not form fields to check
     }
-    
+
     const fieldId = getFieldIdByTitle(fieldTitle);
     if (!fieldId) {
       return false; // Field not found
     }
-    
+
     const form = FormApp.openById(REGISTRATION_FORM.id);
     const items = form.getItems();
-    
+
     // Find the field in the form
     for (let i = 0; i < items.length; i++) {
       if (items[i].getId().toString() === fieldId) {
         const item = items[i];
-        
+
         // Different item types have different ways to check if they're required
         switch (item.getType()) {
           case FormApp.ItemType.TEXT:
@@ -575,7 +569,7 @@ function isFieldRequiredByTitle(fieldTitle) {
         }
       }
     }
-    
+
     return false; // Field not found
   } catch (error) {
     Logger.log(`⚠️ Error checking if field "${fieldTitle}" is required: ${error.message}`);
@@ -592,21 +586,19 @@ function logFieldRequirements() {
     const form = FormApp.openById(REGISTRATION_FORM.id);
     const items = form.getItems();
     Logger.log('--- Form Field Requirements ---');
-    
+
     items.forEach(item => {
       const id = item.getId();
       const title = item.getTitle();
       const type = item.getType();
       const isRequired = isFieldRequired(id);
-      
+
       Logger.log(`Title: "${title}" | ID: ${id} | Type: ${type} | Required: ${isRequired}`);
     });
-    
+
     // Also check the configured fields specifically
     Logger.log('--- Configured Field Status ---');
-    // Legacy QID references - consider removing or updating based on form structure
-    // Logger.log(`QID_EMAIL (${CONFIG.QID_EMAIL}): ${CONFIG.QID_EMAIL === 0 ? 'Auto-collected (always required)' : `Required: ${isFieldRequired(CONFIG.QID_EMAIL)}`}`);
-    // Logger.log(`QID_PHONE (${CONFIG.QID_PHONE}): Required: ${isFieldRequired(CONFIG.QID_PHONE)}`);
+
     Logger.log('--- Form field validation requires manual setup ---');
     Logger.log('------------------------------------');
   } catch (e) {
@@ -625,16 +617,16 @@ function getFieldIdByTitle(fieldTitle) {
     if (!fieldTitle || fieldTitle.trim() === '') {
       return null;
     }
-    
+
     const form = FormApp.openById(REGISTRATION_FORM.id);
     const items = form.getItems();
-    
+
     for (let i = 0; i < items.length; i++) {
       if (items[i].getTitle().trim().toLowerCase() === fieldTitle.trim().toLowerCase()) {
         return items[i].getId().toString();
       }
     }
-    
+
     Logger.log(`⚠️ Field with title "${fieldTitle}" not found in registration form.`);
     return null;
   } catch (error) {
@@ -652,11 +644,11 @@ function getFormFieldMapping() {
     const form = FormApp.openById(REGISTRATION_FORM.id);
     const items = form.getItems();
     const mapping = {};
-    
+
     items.forEach(item => {
       mapping[item.getTitle()] = item.getId().toString();
     });
-    
+
     return mapping;
   } catch (error) {
     Logger.log(`⚠️ Error getting form field mapping: ${error.message}`);
@@ -676,17 +668,17 @@ function autoDetectEntryIds() {
       Logger.log('⚠️ Could not extract form ID from attendance form URL');
       return {};
     }
-    
+
     const attendanceFormId = urlMatch[1];
     const attendanceForm = FormApp.openById(attendanceFormId);
     const items = attendanceForm.getItems();
-    
+
     const entryIds = {};
-    
+
     items.forEach(item => {
       const title = item.getTitle().trim();
       const id = item.getId();
-      
+
       // Map field titles to entry IDs (case-insensitive matching)
       if (title.toLowerCase() === ATTENDANCE_FORM.fields_name.EMAIL.toLowerCase()) {
         entryIds.EMAIL = `entry.${id}`;
@@ -705,7 +697,7 @@ function autoDetectEntryIds() {
         Logger.log(`Found LOCATION field: "${title}" → entry.${id}`);
       }
     });
-    
+
     Logger.log('✅ Auto-detected entry IDs:', entryIds);
     return entryIds;
   } catch (error) {
@@ -720,133 +712,48 @@ function autoDetectEntryIds() {
 }
 
 /**
- * Gets the entry ID for a field, using auto-detection if not manually configured.
- * @param {string} fieldType The field type (EMAIL, PHONE, FULL_NAME, ICARE, LOCATION).
- * @returns {string} The entry ID.
- */
-function getEntryId(fieldType) {
-  // Check if manually configured
-  const manualEntryId = CONFIG[`ENTRY_ID_${fieldType}`];
-  if (manualEntryId && manualEntryId.trim() !== '') {
-    return manualEntryId;
-  }
-  
-  // Auto-detect if not cached (using a simple variable for caching)
-  if (!globalThis._cachedEntryIds) {
-    globalThis._cachedEntryIds = autoDetectEntryIds();
-  }
-  
-  return globalThis._cachedEntryIds[fieldType] || '';
-}
-
-/**
- * Tests the configured entry IDs for the attendance form.
- */
-function testEntryIdDetection() {
-  try {
-    Logger.log('--- Testing Entry ID Auto-Detection ---');
-    
-    // Clear cache to force fresh detection
-    globalThis._cachedEntryIds = null;
-    
-    const detectedIds = autoDetectEntryIds();
-    
-    // Check if auto-detection worked
-    const hasDetectedIds = Object.keys(detectedIds).length > 0;
-    
-    if (!hasDetectedIds) {
-      Logger.log('⚠️ Auto-detection failed. Showing manual instructions...');
-      getManualEntryIdInstructions();
-      return;
-    }
-    
-    Logger.log('Auto-Detected Entry IDs:');
-    Object.entries(detectedIds).forEach(([key, entryId]) => {
-      Logger.log(`  ${key}: ${entryId}`);
-    });
-    
-    Logger.log('Final Entry IDs (with manual overrides):');
-    ['EMAIL', 'PHONE', 'FULL_NAME', 'ICARE', 'LOCATION'].forEach(fieldType => {
-      const entryId = getEntryId(fieldType);
-      const source = CONFIG[`ENTRY_ID_${fieldType}`] && CONFIG[`ENTRY_ID_${fieldType}`].trim() !== '' ? 'MANUAL' : 'AUTO-DETECTED';
-      Logger.log(`  ${fieldType}: ${entryId} (${source})`);
-    });
-    
-    Logger.log('--- Attendance Form Field Mapping ---');
-    Object.entries(ATTENDANCE_FORM.fields_name).forEach(([key, title]) => {
-      Logger.log(`  ${key}: Looking for "${title}"`);
-    });
-    
-    Logger.log('--- Test QR Code URL Generation ---');
-    const testMember = {
-      email: 'test@example.com',
-      englishName: 'Test User',
-      phone: '+1234567890',
-      iCare: 'Test iCare'
-    };
-    
-    const baseUrl = `${ATTENDANCE_FORM.url}?usp=pp_url` +
-      `&${getEntryId('EMAIL')}=${encodeURIComponent(testMember.email)}` +
-      `&${getEntryId('PHONE')}=${encodeURIComponent(testMember.phone)}` +
-      `&${getEntryId('FULL_NAME')}=${encodeURIComponent(testMember.englishName)}` +
-      `&${getEntryId('ICARE')}=${encodeURIComponent(testMember.iCare)}`;
-    
-    const taipeiUrl = `${baseUrl}&${getEntryId('LOCATION')}=Taipei`;
-    
-    Logger.log('Sample pre-filled URL:');
-    Logger.log(taipeiUrl);
-    
-    Logger.log('------------------------------------');
-  } catch (e) {
-    Logger.log(`Error testing entry ID detection: ${e.message}`);
-    Logger.log('⚠️ Showing manual instructions as fallback...');
-    getManualEntryIdInstructions();
-  }
-}
-
-/**
  * Logs all fields in the attendance form for debugging field title matching.
  */
 function logAttendanceFormFields() {
   try {
     Logger.log('--- Attendance Form Fields ---');
-    
+
     // Extract form ID from attendance form URL
     const urlMatch = ATTENDANCE_FORM.url.match(/\/forms\/d\/([a-zA-Z0-9-_]+)/);
     if (!urlMatch) {
       Logger.log('⚠️ Could not extract form ID from attendance form URL');
       return;
     }
-    
+
     const attendanceFormId = urlMatch[1];
     const attendanceForm = FormApp.openById(attendanceFormId);
     const items = attendanceForm.getItems();
-    
+
     Logger.log(`Form ID: ${attendanceFormId}`);
     Logger.log(`Form Title: ${attendanceForm.getTitle()}`);
     Logger.log('');
-    
+
     items.forEach((item, index) => {
       const title = item.getTitle();
       const id = item.getId();
       const type = item.getType();
-      
+
       // Check if this field matches any configured field
-      const matchedField = Object.entries(ATTENDANCE_FORM.fields_name).find(([key, configTitle]) => 
+      const matchedField = Object.entries(ATTENDANCE_FORM.fields_name).find(([key, configTitle]) =>
         title.toLowerCase() === configTitle.toLowerCase()
       );
-      
+
       const status = matchedField ? `✅ MATCHES ${matchedField[0]}` : '❌ NO MATCH';
-      
+
       Logger.log(`${index + 1}. "${title}" (ID: ${id}, Type: ${type}) ${status}`);
     });
-    
+
     Logger.log('');
     Logger.log('--- Configured Field Titles ---');
     Object.entries(ATTENDANCE_FORM.fields_name).forEach(([key, title]) => {
       Logger.log(`${key}: "${title}"`);
     });
-    
+
     Logger.log('------------------------------------');
   } catch (e) {
     Logger.log(`Error reading attendance form fields: ${e.message}`);
@@ -900,39 +807,39 @@ function logAttendanceFormFields() {
  */
 function matchesFieldTitle(questionTitle, configTitle) {
   if (!questionTitle || !configTitle) return false;
-  
+
   // Normalize both titles for comparison
   const normalizeTitle = (title) => {
     return title.trim().toLowerCase()
       .replace(/[^\w\s]/g, '') // Remove punctuation
       .replace(/\s+/g, ' '); // Normalize whitespace
   };
-  
+
   const normalizedQuestion = normalizeTitle(questionTitle);
   const normalizedConfig = normalizeTitle(configTitle);
-  
+
   // Exact match
   if (normalizedQuestion === normalizedConfig) {
     return true;
   }
-  
+
   // Partial match for common field variations
   const phoneKeywords = ['phone', 'whatsapp', 'number', 'contact'];
   const nameKeywords = ['name', 'full', 'english'];
   const birthdayKeywords = ['birthday', 'birth', 'tanggal', 'lahir'];
-  
+
   if (configTitle.toLowerCase().includes('phone') || configTitle.toLowerCase().includes('whatsapp')) {
     return phoneKeywords.some(keyword => normalizedQuestion.includes(keyword));
   }
-  
+
   if (configTitle.toLowerCase().includes('name') && configTitle.toLowerCase().includes('full')) {
     return nameKeywords.some(keyword => normalizedQuestion.includes(keyword));
   }
-  
+
   if (configTitle.toLowerCase().includes('birthday') || configTitle.toLowerCase().includes('tanggal')) {
     return birthdayKeywords.some(keyword => normalizedQuestion.includes(keyword));
   }
-  
+
   return false;
 }
 
@@ -943,13 +850,13 @@ function matchesFieldTitle(questionTitle, configTitle) {
  */
 function cleanPhoneNumber(phoneNumber) {
   if (!phoneNumber) return '';
-  
+
   // Convert to string and remove common formatting
   let cleaned = phoneNumber.toString().trim();
-  
+
   // Remove common formatting characters
   cleaned = cleaned.replace(/[\s\-\(\)\[\]\.]/g, '');
-  
+
   // Handle international formats
   if (cleaned.startsWith('00')) {
     cleaned = '+' + cleaned.substring(2);
@@ -958,7 +865,7 @@ function cleanPhoneNumber(phoneNumber) {
     // based on your specific country code requirements
     cleaned = cleaned; // Keep as is for now
   }
-  
+
   Logger.log(`Phone cleaning: "${phoneNumber}" → "${cleaned}"`);
   return cleaned;
 }
@@ -969,7 +876,7 @@ function cleanPhoneNumber(phoneNumber) {
 function debugPhoneFieldAndEditUrl() {
   try {
     Logger.log('--- Debug: Phone Field and Edit URL Tests ---');
-    
+
     // Test phone number cleaning
     const testPhones = [
       '+62 812 3456 7890',
@@ -979,13 +886,13 @@ function debugPhoneFieldAndEditUrl() {
       '00628123456789',
       '08123456789'
     ];
-    
+
     Logger.log('Phone Number Cleaning Tests:');
     testPhones.forEach(phone => {
       const cleaned = cleanPhoneNumber(phone);
       Logger.log(`  "${phone}" → "${cleaned}"`);
     });
-    
+
     // Test field title matching
     const testTitles = [
       'WhatsApp Number',
@@ -997,7 +904,7 @@ function debugPhoneFieldAndEditUrl() {
       'Tanggal Lahir',
       'Birthday'
     ];
-    
+
     Logger.log('Field Title Matching Tests:');
     Object.entries(REGISTRATION_FORM.fields).forEach(([key, configTitle]) => {
       Logger.log(`  Config: ${key} = "${configTitle}"`);
@@ -1008,7 +915,7 @@ function debugPhoneFieldAndEditUrl() {
         }
       });
     });
-    
+
     // Test spreadsheet column detection
     Logger.log('Spreadsheet Column Detection:');
     if (SPREADSHEET.id) {
@@ -1020,7 +927,7 @@ function debugPhoneFieldAndEditUrl() {
         headers.forEach((header, index) => {
           Logger.log(`  Column ${index + 1}: "${header}"`);
         });
-        
+
         // Check for edit URL column
         let editUrlColumn = -1;
         for (let i = 0; i < headers.length; i++) {
@@ -1032,7 +939,7 @@ function debugPhoneFieldAndEditUrl() {
         Logger.log(`Edit URL column: ${editUrlColumn === -1 ? 'Not found' : editUrlColumn}`);
       }
     }
-    
+
     Logger.log('------------------------------------');
   } catch (error) {
     Logger.log(`Error in debug function: ${error.message}`);
@@ -1082,7 +989,7 @@ function getDetailedEntryIdInstructions() {
   Logger.log('');
   Logger.log('📝 For EACH of these 5 fields, follow the steps below:');
   Logger.log('');
-  
+
   const fieldsToGet = [
     { key: 'ENTRY_ID_EMAIL', title: 'Email Jemaat Terdaftar', testValue: 'test@example.com' },
     { key: 'ENTRY_ID_PHONE', title: 'WhatsApp Number', testValue: '+628123456789' },
@@ -1090,7 +997,7 @@ function getDetailedEntryIdInstructions() {
     { key: 'ENTRY_ID_ICARE', title: 'iCare', testValue: 'Test iCare' },
     { key: 'ENTRY_ID_LOCATION', title: 'Lokasi', testValue: 'Taipei' }
   ];
-  
+
   fieldsToGet.forEach((field, index) => {
     Logger.log(`${index + 1}. FOR FIELD: "${field.title}"`);
     Logger.log(`   a) Find the field titled "${field.title}" in your form`);
@@ -1103,108 +1010,59 @@ function getDetailedEntryIdInstructions() {
     Logger.log(`   h) Set ${field.key}: 'entry.XXXXXXXXX',`);
     Logger.log('');
   });
-  
+
   Logger.log('🔧 After getting all 5 entry IDs, update your config.js:');
   Logger.log('');
   Logger.log('ENTRY_ID_EMAIL: "entry.123456789",      // Replace with your actual entry ID');
   Logger.log('ENTRY_ID_PHONE: "entry.987654321",      // Replace with your actual entry ID');
   Logger.log('ENTRY_ID_FULL_NAME: "entry.456789123",  // Replace with your actual entry ID');
+}
+
+/**
+ * One-time setup function to create the form submission trigger.
+ * Run this once after setting up your script to enable automatic form processing.
+ */
+function setupFormTrigger() {
+  try {
+    Logger.log('🔧 Setting up form submission trigger...');
+
+    // Delete existing triggers for this function to avoid duplicates
+    const triggers = ScriptApp.getProjectTriggers();
+    let deletedCount = 0;
+
+    triggers.forEach(trigger => {
+      if (trigger.getHandlerFunction() === 'onFormSubmit') {
+        ScriptApp.deleteTrigger(trigger);
+        deletedCount++;
+      }
+    });
+
+    if (deletedCount > 0) {
+      Logger.log(`🗑️ Deleted ${deletedCount} existing trigger(s)`);
+    }
+
+    // Create new form submit trigger
+    const form = FormApp.openById(REGISTRATION_FORM.id);
+    const trigger = ScriptApp.newTrigger('onFormSubmit')
+      .onFormSubmit()
+      .create();
+
+    Logger.log('✅ Form submission trigger created successfully');
+    Logger.log(`📋 Form: ${form.getTitle()}`);
+    Logger.log(`🆔 Trigger ID: ${trigger.getUniqueId()}`);
+    Logger.log('');
+    Logger.log('🎉 Your script is now ready to process form submissions automatically!');
+
+  } catch (error) {
+    Logger.log(`❌ Error creating trigger: ${error.message}`);
+    Logger.log('💡 Make sure:');
+    Logger.log('   1. REGISTRATION_FORM.id is correctly set in config.js');
+    Logger.log('   2. You have edit access to the form');
+    Logger.log('   3. All required permissions have been granted');
+  }
   Logger.log('ENTRY_ID_ICARE: "entry.789123456",      // Replace with your actual entry ID');
   Logger.log('ENTRY_ID_LOCATION: "entry.321654987",   // Replace with your actual entry ID');
   Logger.log('');
   Logger.log('✅ Once updated, run clasp push and test with test_onFormSubmitSafe()');
   Logger.log('=====================================');
-}
-
-/**
- * Tests the system without requiring entry IDs to be configured.
- * This helps verify everything else is working before getting entry IDs.
- */
-function test_SystemWithoutEntryIds() {
-  Logger.log('🧪 Testing system components WITHOUT entry IDs...');
-  Logger.log('==================================================');
-  
-  try {
-    // Test 1: Member extraction
-    Logger.log('1. Testing member extraction from mock form response...');
-    const mockMember = {
-      englishName: 'Test User',
-      chineseName: 'Test Chinese',
-      birthday: new Date('1990-01-01'),
-      iCare: 'Test iCare',
-      phone: '+628123456789',
-      email: 'test@example.com',
-      timestamp: new Date()
-    };
-    
-    Logger.log(`✅ Mock member created: ${mockMember.englishName}`);
-    
-    // Test 2: Phone number cleaning
-    Logger.log('2. Testing phone number cleaning...');
-    const cleanedPhone = cleanPhoneNumber(mockMember.phone);
-    Logger.log(`✅ Phone cleaning: "${mockMember.phone}" → "${cleanedPhone}"`);
-    
-    // Test 3: Duplicate checking (if spreadsheet configured)
-    Logger.log('3. Testing duplicate checking...');
-    if (SPREADSHEET.id) {
-      const exists = checkIfMemberExists(mockMember);
-      Logger.log(`✅ Duplicate check completed: ${exists ? 'Member exists' : 'New member'}`);
-    } else {
-      Logger.log('⚠️ No spreadsheet configured, skipping duplicate check');
-    }
-    
-    // Test 4: QR code URL generation (without actual entry IDs)
-    Logger.log('4. Testing QR code URL generation...');
-    const baseUrl = `${ATTENDANCE_FORM.url}?usp=pp_url`;
-    Logger.log(`✅ Base attendance form URL: ${baseUrl}`);
-    
-    // Test 5: Email HTML generation
-    Logger.log('5. Testing email HTML generation...');
-    const emailHtml = createWelcomeEmailHtml(mockMember);
-    const hasContent = emailHtml.includes(mockMember.englishName) && 
-                      emailHtml.includes('taipeiQr') && 
-                      emailHtml.includes('zhongliQr');
-    Logger.log(`✅ Email HTML generated successfully: ${hasContent ? 'All content present' : 'Missing content'}`);
-    
-    // Test 6: Entry ID status
-    Logger.log('6. Checking entry ID configuration status...');
-    const entryIds = ['EMAIL', 'PHONE', 'FULL_NAME', 'ICARE', 'LOCATION'];
-    const configuredIds = entryIds.filter(id => {
-      const entryId = CONFIG[`ENTRY_ID_${id}`];
-      return entryId && entryId.trim() !== '';
-    });
-    
-    Logger.log(`Entry IDs configured: ${configuredIds.length}/${entryIds.length}`);
-    if (configuredIds.length > 0) {
-      Logger.log(`✅ Configured: ${configuredIds.join(', ')}`);
-    }
-    
-    const missingIds = entryIds.filter(id => {
-      const entryId = CONFIG[`ENTRY_ID_${id}`];
-      return !entryId || entryId.trim() === '';
-    });
-    
-    if (missingIds.length > 0) {
-      Logger.log(`⚠️ Missing: ${missingIds.join(', ')}`);
-      Logger.log('📝 Run getDetailedEntryIdInstructions() for help getting these');
-    }
-    
-    Logger.log('==================================================');
-    Logger.log('📊 SUMMARY:');
-    Logger.log(`✅ Core functions: Working`);
-    Logger.log(`✅ Phone cleaning: Working`);
-    Logger.log(`✅ Email generation: Working`);
-    Logger.log(`${configuredIds.length === entryIds.length ? '✅' : '⚠️'} Entry IDs: ${configuredIds.length}/${entryIds.length} configured`);
-    
-    if (configuredIds.length === entryIds.length) {
-      Logger.log('🎉 All systems ready! You can now test form submissions.');
-    } else {
-      Logger.log('📝 Next step: Configure missing entry IDs using getDetailedEntryIdInstructions()');
-    }
-    
-    return true;
-  } catch (error) {
-    Logger.log(`❌ Test failed: ${error.message}`);
-    return false;
-  }
 }

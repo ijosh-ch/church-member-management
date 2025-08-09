@@ -19,12 +19,13 @@ const ATTENDANCE_FORM = {
     FULL_NAME: 'Full Name',              // Field title in attendance form for name
     ICARE: 'iCare',                      // Field title in attendance form for iCare
     LOCATION: 'Lokasi'                   // Field title in attendance form for location
-  }, fields_id: {
-    EMAIL: '',                     // For "Email Jemaat Terdaftar" field
-    PHONE: '',                     // For "WhatsApp Number" field  
-    FULL_NAME: '',                 // For "Full Name" field
-    ICARE: '',                     // For "iCare" field
-    LOCATION: '',                  // For "Lokasi" field
+  }, 
+  fields_id: {                            // Get this information from ATTENDANCE pre-filled Google form
+    EMAIL: '912489277',                     // For "Email Jemaat Terdaftar" field
+    PHONE: '188905337',                     // For "WhatsApp Number" field
+    FULL_NAME: '2091296168',                 // For "Full Name" field
+    ICARE: '371715918',                     // For "iCare" field
+    LOCATION: '1008173553',                  // For "Lokasi" field
   }, url: 'https://docs.google.com/forms/d/e/1FAIpQLSfeztXprLdisVVjuv3aJra16_MWE2W4IRRAFdu6ygmfRGgoJA/viewform', // URL of the Attendance Form for QR codes.
 }
 
