@@ -59,7 +59,7 @@ function onFormSubmit(e) {
 
   } catch (error) {
     Logger.log(`❌ FATAL ERROR in onFormSubmit: ${error.stack}`);
-    MailApp.sendEmail(CONFIG.ADMIN_EMAIL, "Church Registration Script Error", `An error occurred: \n\n${error.stack}`);
+    MailApp.sendEmail(Session.getActiveUser().getEmail(), "Church Registration Script Error", `An error occurred: \n\n${error.stack}`);
   }
 }
 
@@ -72,8 +72,8 @@ function onFormSubmit(e) {
  */
 function addBirthdayToCalendar(member) {
   try {
-    const calendar = CalendarApp.getCalendarById(CONFIG.BIRTHDAY_CALENDAR_ID);
-    if (!calendar) throw new Error(`Calendar with ID '${CONFIG.BIRTHDAY_CALENDAR_ID}' not found.`);
+    const calendar = CalendarApp.getCalendarById(CALENDAR.id);
+    if (!calendar) throw new Error(`Calendar with ID '${CALENDAR.id}' not found.`);
 
     const recurrence = CalendarApp.newRecurrence().addYearlyRule().until(new Date(member.birthday.getFullYear() + 99, member.birthday.getMonth(), member.birthday.getDate()));
     const eventTitle = `🎂 ${member.englishName} (${member.chineseName})'s Birthday`;
@@ -99,7 +99,7 @@ function generateQRCodeBlobs(member) {
   const qrApiBaseUrl = "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=";
   
   // Build URL with available entry IDs
-  let basePrefilledUrl = `${CONFIG.ATTENDANCE_FORM_URL}?usp=pp_url`;
+  let basePrefilledUrl = `${ATTENDANCE_FORM.url}?usp=pp_url`;
   
   const emailEntryId = getEntryId('EMAIL');
   const phoneEntryId = getEntryId('PHONE');
@@ -189,15 +189,15 @@ function addEditResponseUrlToSpreadsheet(response) {
     
     // Get the spreadsheet - use configured ID or active spreadsheet
     let spreadsheet;
-    if (CONFIG.SPREADSHEET.ID) {
-      spreadsheet = SpreadsheetApp.openById(CONFIG.SPREADSHEET.ID);
+    if (SPREADSHEET.id) {
+      spreadsheet = SpreadsheetApp.openById(SPREADSHEET.id);
     } else {
       spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
     }
     
-    const sheet = spreadsheet.getSheetByName(CONFIG.SPREADSHEET.SHEET);
+    const sheet = spreadsheet.getSheetByName(SPREADSHEET.sheets[0]);
     if (!sheet) {
-      Logger.log(`⚠️ Could not find ${CONFIG.SPREADSHEET.SHEET} sheet. Skipping edit URL addition.`);
+      Logger.log(`⚠️ Could not find ${SPREADSHEET.sheets[0]} sheet. Skipping edit URL addition.`);
       return;
     }
     
@@ -242,7 +242,7 @@ function addEditResponseUrlToSpreadsheet(response) {
 function getColumnIndexForFieldTitle(fieldTitle) {
   try {
     // Handle special case for auto-collected email field
-    if (fieldTitle === CONFIG.FIELD_TITLES.EMAIL && (!fieldTitle || fieldTitle.trim() === '')) {
+    if (fieldTitle === REGISTRATION_FORM.fields.EMAIL && (!fieldTitle || fieldTitle.trim() === '')) {
       // No separate email field, use auto-collected email (column 1)
       return 1;
     }
@@ -253,7 +253,7 @@ function getColumnIndexForFieldTitle(fieldTitle) {
       return -1;
     }
     
-    const form = FormApp.openById(CONFIG.REGISTRATION_FORM_ID);
+    const form = FormApp.openById(REGISTRATION_FORM.id);
     const items = form.getItems();
     
     // Find the position of the field in the form
@@ -302,27 +302,27 @@ function checkIfMemberExists(member) {
   try {
     // Get the spreadsheet - use configured ID or active spreadsheet
     let spreadsheet;
-    if (CONFIG.SPREADSHEET.ID) {
-      spreadsheet = SpreadsheetApp.openById(CONFIG.SPREADSHEET.ID);
+    if (SPREADSHEET.id) {
+      spreadsheet = SpreadsheetApp.openById(SPREADSHEET.id);
     } else {
       spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
     }
     
-    const sheet = spreadsheet.getSheetByName(CONFIG.SPREADSHEET.SHEET);
+    const sheet = spreadsheet.getSheetByName(SPREADSHEET.sheets[0]);
     if (!sheet) {
-      Logger.log(`⚠️ Could not find '${CONFIG.SPREADSHEET.SHEET}' sheet. Assuming member doesn't exist.`);
+      Logger.log(`⚠️ Could not find '${SPREADSHEET.sheets[0]}' sheet. Assuming member doesn't exist.`);
       return false;
     }
     
     const data = sheet.getDataRange().getValues();
     
     // Get column indices and check if fields are required
-    const emailColumnIndex = getColumnIndexForFieldTitle(CONFIG.FIELD_TITLES.EMAIL);
-    const phoneColumnIndex = getColumnIndexForFieldTitle(CONFIG.FIELD_TITLES.PHONE);
+    const emailColumnIndex = getColumnIndexForFieldTitle(REGISTRATION_FORM.fields.EMAIL);
+    const phoneColumnIndex = getColumnIndexForFieldTitle(REGISTRATION_FORM.fields.PHONE);
     
     // Check if fields are required (only check required fields for uniqueness)
-    const emailIsRequired = (!CONFIG.FIELD_TITLES.EMAIL || CONFIG.FIELD_TITLES.EMAIL.trim() === '') || isFieldRequiredByTitle(CONFIG.FIELD_TITLES.EMAIL) || emailColumnIndex === 1; // Email is always required if auto-collected
-    const phoneIsRequired = isFieldRequiredByTitle(CONFIG.FIELD_TITLES.PHONE);
+    const emailIsRequired = (!REGISTRATION_FORM.fields.EMAIL || REGISTRATION_FORM.fields.EMAIL.trim() === '') || isFieldRequiredByTitle(REGISTRATION_FORM.fields.EMAIL) || emailColumnIndex === 1; // Email is always required if auto-collected
+    const phoneIsRequired = isFieldRequiredByTitle(REGISTRATION_FORM.fields.PHONE);
     
     Logger.log(`Field requirement status - Email required: ${emailIsRequired}, Phone required: ${phoneIsRequired}`);
     Logger.log(`Column indices - Email: ${emailColumnIndex}, Phone: ${phoneColumnIndex}`);
@@ -405,23 +405,23 @@ function getMemberDetailsFromResponse(response) {
     if (!answer) continue; // Skip unanswered questions
 
     // Match field titles from CONFIG (using more flexible matching)
-    if (matchesFieldTitle(questionTitle, CONFIG.FIELD_TITLES.ENGLISH_NAME)) {
+    if (matchesFieldTitle(questionTitle, REGISTRATION_FORM.fields.ENGLISH_NAME)) {
       member.englishName = answer;
       Logger.log(`✅ Matched ENGLISH_NAME: ${answer}`);
-    } else if (matchesFieldTitle(questionTitle, CONFIG.FIELD_TITLES.CHINESE_NAME)) {
+    } else if (matchesFieldTitle(questionTitle, REGISTRATION_FORM.fields.CHINESE_NAME)) {
       member.chineseName = answer;
       Logger.log(`✅ Matched CHINESE_NAME: ${answer}`);
-    } else if (matchesFieldTitle(questionTitle, CONFIG.FIELD_TITLES.BIRTHDAY)) {
+    } else if (matchesFieldTitle(questionTitle, REGISTRATION_FORM.fields.BIRTHDAY)) {
       member.birthday = new Date(answer);
       Logger.log(`✅ Matched BIRTHDAY: ${answer}`);
-    } else if (matchesFieldTitle(questionTitle, CONFIG.FIELD_TITLES.ICARE)) {
+    } else if (matchesFieldTitle(questionTitle, REGISTRATION_FORM.fields.ICARE)) {
       member.iCare = answer;
       Logger.log(`✅ Matched ICARE: ${answer}`);
-    } else if (matchesFieldTitle(questionTitle, CONFIG.FIELD_TITLES.PHONE)) {
+    } else if (matchesFieldTitle(questionTitle, REGISTRATION_FORM.fields.PHONE)) {
       // Clean and normalize phone number
       member.phone = cleanPhoneNumber(answer);
       Logger.log(`✅ Matched PHONE: ${answer} → cleaned: ${member.phone}`);
-    } else if (CONFIG.FIELD_TITLES.EMAIL && matchesFieldTitle(questionTitle, CONFIG.FIELD_TITLES.EMAIL)) {
+    } else if (REGISTRATION_FORM.fields.EMAIL && matchesFieldTitle(questionTitle, REGISTRATION_FORM.fields.EMAIL)) {
       // Override respondent email if there's a specific email field
       member.email = answer;
       Logger.log(`✅ Matched EMAIL: ${answer}`);
@@ -467,7 +467,7 @@ function createWelcomeEmailHtml(member) {
             <h3>IFGF Taipei</h3>
             <img src="cid:taipeiQr" alt="IFGF Taipei QR Code" style="width:300px; height:300px; max-width: 100%;">
             <p style="font-size: 0.9em; margin-top: 10px;">
-              <strong>Lokasi:</strong> <a href="${CONFIG.LOCATION_TAIPEI_URL}">Buka di Google Maps</a>
+              <strong>Lokasi:</strong> <a href="${CHURCH.branches.find(b => b.name === 'Taipei')?.gmaps}">Buka di Google Maps</a>
             </p>
           </div>
           
@@ -475,7 +475,7 @@ function createWelcomeEmailHtml(member) {
             <h3>IFGF Zhongli</h3>
             <img src="cid:zhongliQr" alt="IFGF Zhongli QR Code" style="width:300px; height:300px; max-width: 100%;">
             <p style="font-size: 0.9em; margin-top: 10px;">
-              <strong>Lokasi:</strong> <a href="${CONFIG.LOCATION_ZHONGLI_URL}">Buka di Google Maps</a>
+              <strong>Lokasi:</strong> <a href="${CHURCH.branches.find(b => b.name === 'Zhongli')?.gmaps}">Buka di Google Maps</a>
             </p>
           </div>
         </div>
@@ -494,11 +494,11 @@ function createWelcomeEmailHtml(member) {
  */
 function logQuestionIDs() {
   try {
-    const form = FormApp.openById(CONFIG.REGISTRATION_FORM_ID);
+    const form = FormApp.openById(REGISTRATION_FORM.id);
     const items = form.getItems();
     Logger.log('--- Registration Form Question IDs ---');
     
-    const configuredTitles = Object.values(CONFIG.FIELD_TITLES);
+    const configuredTitles = Object.values(REGISTRATION_FORM.fields);
     
     items.forEach(item => {
       const title = item.getTitle();
@@ -511,7 +511,7 @@ function logQuestionIDs() {
     });
     
     Logger.log('--- Configured Field Status ---');
-    Object.entries(CONFIG.FIELD_TITLES).forEach(([key, title]) => {
+    Object.entries(REGISTRATION_FORM.fields).forEach(([key, title]) => {
       const found = items.some(item => 
         item.getTitle().toLowerCase() === title.toLowerCase()
       );
@@ -520,7 +520,7 @@ function logQuestionIDs() {
     
     Logger.log('------------------------------------');
   } catch (e) {
-    Logger.log(`Error: Could not open form with ID "${CONFIG.REGISTRATION_FORM_ID}". Please check the ID in the CONFIG object.`)
+    Logger.log(`Error: Could not open form with ID "${REGISTRATION_FORM.id}". Please check the ID in the config.js object.`)
   }
 }
 
@@ -540,7 +540,7 @@ function isFieldRequiredByTitle(fieldTitle) {
       return false; // Field not found
     }
     
-    const form = FormApp.openById(CONFIG.REGISTRATION_FORM_ID);
+    const form = FormApp.openById(REGISTRATION_FORM.id);
     const items = form.getItems();
     
     // Find the field in the form
@@ -589,7 +589,7 @@ function isFieldRequiredByTitle(fieldTitle) {
  */
 function logFieldRequirements() {
   try {
-    const form = FormApp.openById(CONFIG.REGISTRATION_FORM_ID);
+    const form = FormApp.openById(REGISTRATION_FORM.id);
     const items = form.getItems();
     Logger.log('--- Form Field Requirements ---');
     
@@ -604,11 +604,13 @@ function logFieldRequirements() {
     
     // Also check the configured fields specifically
     Logger.log('--- Configured Field Status ---');
-    Logger.log(`QID_EMAIL (${CONFIG.QID_EMAIL}): ${CONFIG.QID_EMAIL === 0 ? 'Auto-collected (always required)' : `Required: ${isFieldRequired(CONFIG.QID_EMAIL)}`}`);
-    Logger.log(`QID_PHONE (${CONFIG.QID_PHONE}): Required: ${isFieldRequired(CONFIG.QID_PHONE)}`);
+    // Legacy QID references - consider removing or updating based on form structure
+    // Logger.log(`QID_EMAIL (${CONFIG.QID_EMAIL}): ${CONFIG.QID_EMAIL === 0 ? 'Auto-collected (always required)' : `Required: ${isFieldRequired(CONFIG.QID_EMAIL)}`}`);
+    // Logger.log(`QID_PHONE (${CONFIG.QID_PHONE}): Required: ${isFieldRequired(CONFIG.QID_PHONE)}`);
+    Logger.log('--- Form field validation requires manual setup ---');
     Logger.log('------------------------------------');
   } catch (e) {
-    Logger.log(`Error: Could not analyze form requirements with ID "${CONFIG.REGISTRATION_FORM_ID}". Please check the ID in the CONFIG object.`)
+    Logger.log(`Error: Could not analyze form requirements with ID "${REGISTRATION_FORM.id}". Please check the ID in the config.js object.`)
   }
 }
 
@@ -624,7 +626,7 @@ function getFieldIdByTitle(fieldTitle) {
       return null;
     }
     
-    const form = FormApp.openById(CONFIG.REGISTRATION_FORM_ID);
+    const form = FormApp.openById(REGISTRATION_FORM.id);
     const items = form.getItems();
     
     for (let i = 0; i < items.length; i++) {
@@ -647,7 +649,7 @@ function getFieldIdByTitle(fieldTitle) {
  */
 function getFormFieldMapping() {
   try {
-    const form = FormApp.openById(CONFIG.REGISTRATION_FORM_ID);
+    const form = FormApp.openById(REGISTRATION_FORM.id);
     const items = form.getItems();
     const mapping = {};
     
@@ -669,7 +671,7 @@ function getFormFieldMapping() {
 function autoDetectEntryIds() {
   try {
     // Extract form ID from attendance form URL
-    const urlMatch = CONFIG.ATTENDANCE_FORM_URL.match(/\/forms\/d\/([a-zA-Z0-9-_]+)/);
+    const urlMatch = ATTENDANCE_FORM.url.match(/\/forms\/d\/([a-zA-Z0-9-_]+)/);
     if (!urlMatch) {
       Logger.log('⚠️ Could not extract form ID from attendance form URL');
       return {};
@@ -686,19 +688,19 @@ function autoDetectEntryIds() {
       const id = item.getId();
       
       // Map field titles to entry IDs (case-insensitive matching)
-      if (title.toLowerCase() === CONFIG.ATTENDANCE_FORM_FIELDS.EMAIL.toLowerCase()) {
+      if (title.toLowerCase() === ATTENDANCE_FORM.fields_name.EMAIL.toLowerCase()) {
         entryIds.EMAIL = `entry.${id}`;
         Logger.log(`Found EMAIL field: "${title}" → entry.${id}`);
-      } else if (title.toLowerCase() === CONFIG.ATTENDANCE_FORM_FIELDS.PHONE.toLowerCase()) {
+      } else if (title.toLowerCase() === ATTENDANCE_FORM.fields_name.PHONE.toLowerCase()) {
         entryIds.PHONE = `entry.${id}`;
         Logger.log(`Found PHONE field: "${title}" → entry.${id}`);
-      } else if (title.toLowerCase() === CONFIG.ATTENDANCE_FORM_FIELDS.FULL_NAME.toLowerCase()) {
+      } else if (title.toLowerCase() === ATTENDANCE_FORM.fields_name.FULL_NAME.toLowerCase()) {
         entryIds.FULL_NAME = `entry.${id}`;
         Logger.log(`Found FULL_NAME field: "${title}" → entry.${id}`);
-      } else if (title.toLowerCase() === CONFIG.ATTENDANCE_FORM_FIELDS.ICARE.toLowerCase()) {
+      } else if (title.toLowerCase() === ATTENDANCE_FORM.fields_name.ICARE.toLowerCase()) {
         entryIds.ICARE = `entry.${id}`;
         Logger.log(`Found ICARE field: "${title}" → entry.${id}`);
-      } else if (title.toLowerCase() === CONFIG.ATTENDANCE_FORM_FIELDS.LOCATION.toLowerCase()) {
+      } else if (title.toLowerCase() === ATTENDANCE_FORM.fields_name.LOCATION.toLowerCase()) {
         entryIds.LOCATION = `entry.${id}`;
         Logger.log(`Found LOCATION field: "${title}" → entry.${id}`);
       }
@@ -729,12 +731,12 @@ function getEntryId(fieldType) {
     return manualEntryId;
   }
   
-  // Auto-detect if not cached
-  if (!CONFIG._cachedEntryIds) {
-    CONFIG._cachedEntryIds = autoDetectEntryIds();
+  // Auto-detect if not cached (using a simple variable for caching)
+  if (!globalThis._cachedEntryIds) {
+    globalThis._cachedEntryIds = autoDetectEntryIds();
   }
   
-  return CONFIG._cachedEntryIds[fieldType] || '';
+  return globalThis._cachedEntryIds[fieldType] || '';
 }
 
 /**
@@ -745,7 +747,7 @@ function testEntryIdDetection() {
     Logger.log('--- Testing Entry ID Auto-Detection ---');
     
     // Clear cache to force fresh detection
-    CONFIG._cachedEntryIds = null;
+    globalThis._cachedEntryIds = null;
     
     const detectedIds = autoDetectEntryIds();
     
@@ -771,7 +773,7 @@ function testEntryIdDetection() {
     });
     
     Logger.log('--- Attendance Form Field Mapping ---');
-    Object.entries(CONFIG.ATTENDANCE_FORM_FIELDS).forEach(([key, title]) => {
+    Object.entries(ATTENDANCE_FORM.fields_name).forEach(([key, title]) => {
       Logger.log(`  ${key}: Looking for "${title}"`);
     });
     
@@ -783,7 +785,7 @@ function testEntryIdDetection() {
       iCare: 'Test iCare'
     };
     
-    const baseUrl = `${CONFIG.ATTENDANCE_FORM_URL}?usp=pp_url` +
+    const baseUrl = `${ATTENDANCE_FORM.url}?usp=pp_url` +
       `&${getEntryId('EMAIL')}=${encodeURIComponent(testMember.email)}` +
       `&${getEntryId('PHONE')}=${encodeURIComponent(testMember.phone)}` +
       `&${getEntryId('FULL_NAME')}=${encodeURIComponent(testMember.englishName)}` +
@@ -810,7 +812,7 @@ function logAttendanceFormFields() {
     Logger.log('--- Attendance Form Fields ---');
     
     // Extract form ID from attendance form URL
-    const urlMatch = CONFIG.ATTENDANCE_FORM_URL.match(/\/forms\/d\/([a-zA-Z0-9-_]+)/);
+    const urlMatch = ATTENDANCE_FORM.url.match(/\/forms\/d\/([a-zA-Z0-9-_]+)/);
     if (!urlMatch) {
       Logger.log('⚠️ Could not extract form ID from attendance form URL');
       return;
@@ -830,7 +832,7 @@ function logAttendanceFormFields() {
       const type = item.getType();
       
       // Check if this field matches any configured field
-      const matchedField = Object.entries(CONFIG.ATTENDANCE_FORM_FIELDS).find(([key, configTitle]) => 
+      const matchedField = Object.entries(ATTENDANCE_FORM.fields_name).find(([key, configTitle]) => 
         title.toLowerCase() === configTitle.toLowerCase()
       );
       
@@ -841,7 +843,7 @@ function logAttendanceFormFields() {
     
     Logger.log('');
     Logger.log('--- Configured Field Titles ---');
-    Object.entries(CONFIG.ATTENDANCE_FORM_FIELDS).forEach(([key, title]) => {
+    Object.entries(ATTENDANCE_FORM.fields_name).forEach(([key, title]) => {
       Logger.log(`${key}: "${title}"`);
     });
     
@@ -997,7 +999,7 @@ function debugPhoneFieldAndEditUrl() {
     ];
     
     Logger.log('Field Title Matching Tests:');
-    Object.entries(CONFIG.FIELD_TITLES).forEach(([key, configTitle]) => {
+    Object.entries(REGISTRATION_FORM.fields).forEach(([key, configTitle]) => {
       Logger.log(`  Config: ${key} = "${configTitle}"`);
       testTitles.forEach(testTitle => {
         const matches = matchesFieldTitle(testTitle, configTitle);
@@ -1009,9 +1011,9 @@ function debugPhoneFieldAndEditUrl() {
     
     // Test spreadsheet column detection
     Logger.log('Spreadsheet Column Detection:');
-    if (CONFIG.SPREADSHEET.ID) {
-      const spreadsheet = SpreadsheetApp.openById(CONFIG.SPREADSHEET.ID);
-      const sheet = spreadsheet.getSheetByName(CONFIG.SPREADSHEET.SHEET);
+    if (SPREADSHEET.id) {
+      const spreadsheet = SpreadsheetApp.openById(SPREADSHEET.id);
+      const sheet = spreadsheet.getSheetByName(SPREADSHEET.sheets[0]);
       if (sheet) {
         const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
         Logger.log('Spreadsheet headers:');
@@ -1051,10 +1053,10 @@ function getManualEntryIdInstructions() {
   Logger.log('5. Update config.js with the manual entry IDs');
   Logger.log('');
   Logger.log('Current attendance form URL:');
-  Logger.log(CONFIG.ATTENDANCE_FORM_URL);
+  Logger.log(ATTENDANCE_FORM.url);
   Logger.log('');
   Logger.log('Expected field titles to match:');
-  Object.entries(CONFIG.ATTENDANCE_FORM_FIELDS).forEach(([key, title]) => {
+  Object.entries(ATTENDANCE_FORM.fields_name).forEach(([key, title]) => {
     Logger.log(`  ${key}: "${title}"`);
   });
   Logger.log('');
@@ -1144,7 +1146,7 @@ function test_SystemWithoutEntryIds() {
     
     // Test 3: Duplicate checking (if spreadsheet configured)
     Logger.log('3. Testing duplicate checking...');
-    if (CONFIG.SPREADSHEET.ID) {
+    if (SPREADSHEET.id) {
       const exists = checkIfMemberExists(mockMember);
       Logger.log(`✅ Duplicate check completed: ${exists ? 'Member exists' : 'New member'}`);
     } else {
@@ -1153,7 +1155,7 @@ function test_SystemWithoutEntryIds() {
     
     // Test 4: QR code URL generation (without actual entry IDs)
     Logger.log('4. Testing QR code URL generation...');
-    const baseUrl = `${CONFIG.ATTENDANCE_FORM_URL}?usp=pp_url`;
+    const baseUrl = `${ATTENDANCE_FORM.url}?usp=pp_url`;
     Logger.log(`✅ Base attendance form URL: ${baseUrl}`);
     
     // Test 5: Email HTML generation
