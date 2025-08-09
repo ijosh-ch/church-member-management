@@ -33,9 +33,11 @@ const CHURCH = {
   name: 'IFGF',
   branches: [{
     name: 'Taipei',
+    area_code: "TPE",
     gmaps: 'https://g.co/kgs/ue5CEtv'
   }, {
     name: 'Zhongli',
+    area_code: "ZL",
     gmaps: 'https://g.co/kgs/xKRLyXC'
   }]
 }

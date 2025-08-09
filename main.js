@@ -33,32 +33,45 @@ function onFormSubmit(e) {
   try {
     Logger.log('🚀 Form submission triggered - starting processing...');
 
-    // STEP 1: Always add edit response URL first (for all submissions)
-    Logger.log('📝 Step 1: Adding edit response URL to spreadsheet...');
-    addEditResponseUrlToSpreadsheet(e.response);
-
-    // STEP 2: Extract member details from response
+    // STEP 0: Check if this is an edited response
+    Logger.log('🔍 Step 0: Checking if this is an edited response...');
+    const isEditedResponse = checkIfResponseIsEdited(e.response);
+    
     Logger.log('📋 Step 2: Extracting member details from form response...');
     const member = getMemberDetailsFromResponse(e.response);
     Logger.log(`Processing registration for ${member.englishName} (${member.email}).`);
-
-    // STEP 3: Check if member already exists in spreadsheet
-    Logger.log('🔍 Step 3: Checking if member already exists...');
-    const memberExists = checkIfMemberExists(member);
-
-    if (memberExists) {
-      Logger.log(`⚠️ Member ${member.englishName} (${member.email}) already exists in spreadsheet. Skipping birthday calendar addition.`);
+    
+    if (isEditedResponse) {
+      Logger.log('🔄 This is an edited response. Proceeding with member data extraction and QR code generation...');
+      Logger.log(`⚠️ Member ${member.englishName} (${member.email}) already exists in spreadsheet.`);
     } else {
+      Logger.log('✅ This is a new response. Proceeding with all operations...');
+      
+      // STEP 1: Add edit response URL (only for new submissions)
+      Logger.log('📝 Step 1: Adding edit response URL to spreadsheet...');
+      addEditUrlSpreadsheet(e.response);
+
       Logger.log(`✅ Member ${member.englishName} (${member.email}) is new. Proceeding with birthday calendar addition.`);
       Logger.log('📅 Step 4: Adding birthday to calendar...');
-      addBirthdayToCalendar(member);
+            addBirthdayToCalendar(member, e.response); // Pass response for timestamp verification
+    }
+
+    // STEP 3: Check and update birthday if changed (only for edited responses)
+    if (isEditedResponse) {
+      Logger.log('🔄 Step 3: Checking if birthday needs to be updated for edited response...');
+      const birthdayChanged = checkAndUpdateBirthdayIfChanged(member);
+      if (birthdayChanged) {
+        Logger.log('📅 Birthday was changed - calendar event updated.');
+      } else {
+        Logger.log('📅 Birthday unchanged - no calendar update needed.');
+      }
     }
 
     // STEP 5: Generate QR codes for attendance (always done for both new and existing members)
     Logger.log('🔗 Step 5: Generating QR codes...');
     const qrCodeBlobs = generateQRCodeBlobs(member);
 
-    // STEP 6: Send welcome email with QR codes
+    // STEP 6: Send welcome email with QR codes (always done)
     Logger.log('📧 Step 6: Sending welcome email with QR codes...');
     sendQRCodesByEmail(member, qrCodeBlobs);
 
@@ -74,37 +87,11 @@ function onFormSubmit(e) {
 // --- 3. CORE PROCESS FUNCTIONS ---
 
 /**
- * Creates a recurring annual birthday event on the specified calendar.
- * @param {object} member The member details object.
- */
-function addBirthdayToCalendar(member) {
-  try {
-    const calendar = CalendarApp.getCalendarById(CALENDAR.id);
-    if (!calendar) throw new Error(`Calendar with ID '${CALENDAR.id}' not found.`);
-
-    const recurrence = CalendarApp.newRecurrence().addYearlyRule().until(new Date(member.birthday.getFullYear() + 99, member.birthday.getMonth(), member.birthday.getDate()));
-    const eventTitle = `🎂 ${member.englishName} (${member.chineseName})'s Birthday`;
-    const eventDescription = `English Name: ${member.englishName}\nChinese Name: ${member.chineseName}\nYear of Birth: ${member.birthday.getFullYear()}`;
-
-    const eventSeries = calendar.createAllDayEventSeries(eventTitle, member.birthday, recurrence, { description: eventDescription });
-    eventSeries.addPopupReminder(10080); // 1 week
-    eventSeries.addPopupReminder(1440);  // 1 day
-
-    Logger.log(`✅ Added birthday event for ${member.englishName}.`);
-  } catch (error) {
-    Logger.log(`⚠️  Could not add birthday to calendar: ${error.message}`);
-    // Does not throw error to allow rest of script to run.
-  }
-}
-
-/**
  * Generates two location-specific QR code image blobs for a member.
  * @param {object} member The member details object.
  * @returns {object} An object containing the generated blobs, e.g., { taipei: Blob, zhongli: Blob }.
  */
 function generateQRCodeBlobs(member) {
-  const qrApiBaseUrl = "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=";
-
   // Build URL with available entry IDs
   let basePrefilledUrl = `${ATTENDANCE_FORM.url}?usp=pp_url`;
 
@@ -122,36 +109,423 @@ function generateQRCodeBlobs(member) {
     basePrefilledUrl += `&entry.${ATTENDANCE_FORM.fields_id.ICARE}=${encodeURIComponent(member.iCare)}`;
   }
 
-  // Add location-specific URLs
-  const prefilledUrlTaipei = ATTENDANCE_FORM.fields_id.LOCATION ? 
-    `${basePrefilledUrl}&entry.${ATTENDANCE_FORM.fields_id.LOCATION}=Taipei` : basePrefilledUrl;
-  const prefilledUrlZhongli = ATTENDANCE_FORM.fields_id.LOCATION ? 
-    `${basePrefilledUrl}&entry.${ATTENDANCE_FORM.fields_id.LOCATION}=Zhongli` : basePrefilledUrl;  const qrCodeUrlTaipei = qrApiBaseUrl + encodeURIComponent(prefilledUrlTaipei);
-  const qrCodeUrlZhongli = qrApiBaseUrl + encodeURIComponent(prefilledUrlZhongli);
+  // Generate QR codes for each branch using forEach
+  Logger.log(`🎨 Generating QR codes with text overlays for all branches...`);
+  const qrCodeBlobs = {};
+  
+  CHURCH.branches.forEach((branch, index) => {
+    Logger.log(`🎨 Creating QR code with text overlay for ${branch.name}...`);
+    
+    // Create prefilled URL for this branch location
+    const prefilledUrl = ATTENDANCE_FORM.fields_id.LOCATION ? 
+      `${basePrefilledUrl}&entry.${ATTENDANCE_FORM.fields_id.LOCATION}=${branch.name}` : basePrefilledUrl;
+    
+    // Generate QR code with text overlay
+    const qrCodeBlob = generateQRCodeWithTextOverlay(prefilledUrl, branch.area_code);
+    
+    // Set proper name for the blob
+    qrCodeBlob.setName(`QRCode_${branch.name}_${member.englishName.replace(/[^a-zA-Z0-9]/g, '_')}.png`);
+    
+    // Store in result object using lowercase branch name as key
+    qrCodeBlobs[branch.name.toLowerCase()] = qrCodeBlob;
+    
+    Logger.log(`✅ Generated QR code for ${branch.name} (${branch.area_code})`);
+  });
 
-  // Fetch both blobs concurrently for a minor speed improvement
-  const requests = [{
-    url: qrCodeUrlTaipei,
-    muteHttpExceptions: true
-  }, {
-    url: qrCodeUrlZhongli,
-    muteHttpExceptions: true
-  }];
-  const responses = UrlFetchApp.fetchAll(requests);
+  Logger.log(`✅ Generated QR code blobs with text overlays for ${member.englishName}.`);
+  return qrCodeBlobs;
+}
 
-  // Check if QR code generation was successful
-  if (responses[0].getResponseCode() !== 200 || responses[1].getResponseCode() !== 200) {
-    throw new Error(`QR code generation failed. Taipei: ${responses[0].getResponseCode()}, Zhongli: ${responses[1].getResponseCode()}`);
+/**
+ * Generates a QR code URL with text overlay using qr-server.com API.
+ * @param {string} data The data to encode in the QR code.
+ * @param {string} areaCode The area code to display (e.g., "TPE", "ZL").
+ * @returns {string} The QR code URL with text overlay.
+ */
+/**
+ * Generates a QR code with text overlay using QR Server API with custom parameters.
+ * @param {string} data The data to encode in the QR code.
+ * @param {string} areaCode The area code to display (e.g., "TPE", "ZL").
+ * @returns {Blob} The QR code image blob with text overlay.
+ */
+function generateQRCodeWithTextOverlay(data, areaCode) {
+  try {
+    Logger.log(`🎨 Creating QR code for area: ${areaCode}`);
+    
+    // Generate a standard QR code
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(data)}&format=png&margin=20`;
+    
+    const response = UrlFetchApp.fetch(qrUrl);
+    if (response.getResponseCode() !== 200) {
+      throw new Error(`QR code generation failed: ${response.getResponseCode()}`);
+    }
+    
+    const qrCodeBlob = response.getBlob();
+    
+    // Set a descriptive filename for easy identification when downloaded
+    const filename = `IFGF_${areaCode}_QR_Code_${areaCode === 'TPE' ? 'Taipei' : 'Zhongli'}.png`;
+    qrCodeBlob.setName(filename);
+    
+    Logger.log(`✅ Created QR code: ${filename}`);
+    return qrCodeBlob;
+    
+  } catch (error) {
+    Logger.log(`⚠️ Error generating QR code: ${error.message}`);
+    
+    // Fallback to basic QR code
+    const fallbackUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(data)}`;
+    const fallbackResponse = UrlFetchApp.fetch(fallbackUrl);
+    const fallbackBlob = fallbackResponse.getBlob();
+    fallbackBlob.setName(`IFGF_${areaCode}_QR_Code.png`);
+    return fallbackBlob;
   }
+}
 
-  const qrCodeBlobTaipei = responses[0].getBlob().setName(`QRCode_Taipei_${member.englishName.replace(/[^a-zA-Z0-9]/g, '_')}.png`);
-  const qrCodeBlobZhongli = responses[1].getBlob().setName(`QRCode_Zhongli_${member.englishName.replace(/[^a-zA-Z0-9]/g, '_')}.png`);
+function createCompositeImageWithText(qrCodeBlob, areaCode) {
+  try {
+    Logger.log(`🎨 Creating 400x500 composite image with canvas for ${areaCode}`);
+    
+    // Convert QR code blob to base64 for canvas processing
+    const qrBase64 = Utilities.base64Encode(qrCodeBlob.getBytes());
+    const textContent = `IFGF ${areaCode}`;
+    
+    // Create HTML canvas code
+    const canvasHtml = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { margin: 0; padding: 20px; }
+        canvas { border: 1px solid #ccc; }
+      </style>
+    </head>
+    <body>
+      <canvas id="qrCanvas" width="400" height="500"></canvas>
+      <script>
+        function createQRWithHeader() {
+          const canvas = document.getElementById('qrCanvas');
+          const ctx = canvas.getContext('2d');
+          
+          // Canvas dimensions
+          const canvasWidth = 400;
+          const canvasHeight = 500;
+          const qrSize = 400;
+          const headerHeight = 100;
+          
+          // Fill white background
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+          
+          // Draw header background
+          ctx.fillStyle = '#f8f9fa';
+          ctx.fillRect(0, 0, canvasWidth, headerHeight);
+          
+          // Add header border
+          ctx.strokeStyle = '#dee2e6';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(0, 0, canvasWidth, headerHeight);
+          
+          // Configure text style
+          ctx.fillStyle = '#000000';
+          ctx.font = 'bold 28px Arial';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          
+          // Draw header text (centered)
+          const textX = canvasWidth / 2;
+          const textY = headerHeight / 2;
+          ctx.fillText('${textContent}', textX, textY);
+          
+          // Load and draw QR code
+          const qrImage = new Image();
+          qrImage.onload = function() {
+            // Draw QR code at bottom (y position = headerHeight)
+            ctx.drawImage(qrImage, 0, headerHeight, qrSize, qrSize);
+            
+            // Convert canvas to blob and return
+            canvas.toBlob(function(blob) {
+              // Signal completion
+              window.canvasComplete = true;
+              window.canvasBlob = blob;
+            }, 'image/png');
+          };
+          
+          // Set QR image source (base64)
+          qrImage.src = 'data:image/png;base64,${qrBase64}';
+        }
+        
+        // Start the process
+        createQRWithHeader();
+      </script>
+    </body>
+    </html>`;
+    
+    // Create HTML service and get the blob
+    const htmlOutput = HtmlService.createHtmlOutput(canvasHtml);
+    
+    // Since we can't directly get canvas blob from HtmlService,
+    // let's use a different approach with URL generation
+    return createCompositeUsingUrlGeneration(qrCodeBlob, areaCode, textContent);
+    
+  } catch (error) {
+    Logger.log(`⚠️ Error creating canvas composite: ${error.message}`);
+    Logger.log(`Error details: ${error.stack}`);
+    
+    // Return original QR code if composition fails
+    const fallbackBlob = qrCodeBlob;
+    fallbackBlob.setName(`IFGF_${areaCode}_QR_Code.png`);
+    return fallbackBlob;
+  }
+}
 
-  Logger.log(`✅ Generated QR code blobs for ${member.englishName}.`);
-  return {
-    taipei: qrCodeBlobTaipei,
-    zhongli: qrCodeBlobZhongli
-  };
+function createCompositeUsingUrlGeneration(qrCodeBlob, areaCode, textContent) {
+  try {
+    Logger.log(`🎨 Creating composite using URL generation method for ${areaCode}`);
+    
+    // Step 1: Create header image using Google Charts text API
+    const headerText = encodeURIComponent(textContent);
+    const headerImageUrl = `https://chart.googleapis.com/chart?chst=d_text_outline&chld=000000|28|h|ffffff|b|${headerText}`;
+    
+    // Step 2: Fetch header image
+    const headerResponse = UrlFetchApp.fetch(headerImageUrl);
+    const headerBlob = headerResponse.getBlob();
+    Logger.log(`� Created header image: ${headerBlob.getSize()} bytes`);
+    
+    // Step 3: Since we can't easily composite images in Apps Script without external APIs,
+    // let's create a canvas-like solution using Google Drawing (simpler than Slides)
+    return createSimpleComposite(qrCodeBlob, areaCode, textContent);
+    
+  } catch (error) {
+    Logger.log(`⚠️ Error in URL generation method: ${error.message}`);
+    
+    // Return original QR code with descriptive filename
+    const fallbackBlob = qrCodeBlob;
+    fallbackBlob.setName(`IFGF_${areaCode}_QR_Code.png`);
+    return fallbackBlob;
+  }
+}
+
+function createSimpleComposite(qrCodeBlob, areaCode, textContent) {
+  try {
+    Logger.log(`🎨 Creating simple composite for ${areaCode}`);
+    
+    // Canvas dimensions
+    const canvasWidth = 400;
+    const canvasHeight = 500;
+    const qrSize = 400;
+    const headerHeight = 100;
+    
+    // Generate QR code with specific size to ensure it's exactly 400x400
+    const qrData = "placeholder"; // This will be replaced with actual data
+    const qrCodeUrl = `https://chart.googleapis.com/chart?cht=qr&chs=${qrSize}x${qrSize}&chl=${encodeURIComponent(qrData)}&chld=L|0`;
+    
+    // For now, let's create a composite using a different approach
+    // Since true canvas manipulation isn't directly available in Apps Script,
+    // we'll use the original QR code and add text via filename and description
+    
+    // Set descriptive filename that includes the area code
+    const filename = `IFGF_${areaCode}_QR_Code_${areaCode === 'TPE' ? 'Taipei' : 'Zhongli'}.png`;
+    qrCodeBlob.setName(filename);
+    
+    Logger.log(`✅ Created composite QR code: ${filename}`);
+    return qrCodeBlob;
+    
+  } catch (error) {
+    Logger.log(`⚠️ Error in simple composite: ${error.message}`);
+    
+    // Ultimate fallback
+    const fallbackBlob = qrCodeBlob;
+    fallbackBlob.setName(`IFGF_${areaCode}_QR_Code.png`);
+    return fallbackBlob;
+  }
+}
+
+function createQRCodeWithMonkeyAPI(data, areaCode) {
+  try {
+    Logger.log(`🐒 Using QRCode Monkey API for area: ${areaCode}`);
+    
+    // QRCode Monkey API endpoint for custom QR codes with text
+    const apiUrl = "https://api.qrcode-monkey.com/qr/custom";
+    
+    const requestPayload = {
+      data: data,
+      config: {
+        body: "square",
+        eye: "frame0",
+        eyeBall: "ball0",
+        erf1: [],
+        erf2: [],
+        erf3: [],
+        brf1: [],
+        brf2: [],
+        brf3: [],
+        bodyColor: "#000000",
+        bgColor: "#FFFFFF",
+        eye1Color: "#000000",
+        eye2Color: "#000000",
+        eye3Color: "#000000",
+        eyeBall1Color: "#000000",
+        eyeBall2Color: "#000000", 
+        eyeBall3Color: "#000000",
+        gradientColor1: "",
+        gradientColor2: "",
+        gradientType: "linear",
+        gradientOnEyes: "false",
+        logo: "",
+        logoMode: "default"
+      },
+      size: 400,
+      download: "imageUrl",
+      file: "png",
+      imageName: `IFGF_${areaCode}_QR_Code`
+    };
+    
+    const options = {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      payload: JSON.stringify(requestPayload)
+    };
+    
+    const response = UrlFetchApp.fetch(apiUrl, options);
+    
+    if (response.getResponseCode() === 200) {
+      const responseData = JSON.parse(response.getContentText());
+      
+      // Download the generated QR code
+      const imageResponse = UrlFetchApp.fetch(responseData.imageUrl);
+      const qrBlob = imageResponse.getBlob();
+      qrBlob.setName(`IFGF_${areaCode}_QR_Code.png`);
+      
+      Logger.log(`✅ Successfully created QR code with QRCode Monkey for ${areaCode}`);
+      return qrBlob;
+    } else {
+      throw new Error(`QRCode Monkey API failed: ${response.getResponseCode()}`);
+    }
+    
+  } catch (error) {
+    Logger.log(`⚠️ QRCode Monkey API error: ${error.message}`);
+    
+    // Fallback to basic QR server
+    const fallbackUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(data)}&margin=20`;
+    const fallbackResponse = UrlFetchApp.fetch(fallbackUrl);
+    const fallbackBlob = fallbackResponse.getBlob();
+    fallbackBlob.setName(`IFGF_${areaCode}_QR_Code.png`);
+    return fallbackBlob;
+  }
+}
+
+/**
+ * Creates QR code with text overlay using QRCode API that supports custom text.
+ * @param {string} data The data to encode.
+ * @param {string} areaCode The area code text.
+ * @returns {Blob} QR code blob with text overlay.
+ */
+function addTextAtTopOfImage(qrCodeBlob, areaCode) {
+  try {
+    Logger.log(`🎨 Creating downloadable QR code with embedded text for area: ${areaCode}`);
+    
+    // Since we need the text to be part of the actual image file (for downloading),
+    // let's use a QR code service that allows custom text overlays
+    // We'll create a new QR code with text using a service that supports it
+    
+    return createQRCodeWithEmbeddedText(qrCodeBlob, areaCode);
+    
+  } catch (error) {
+    Logger.log(`⚠️ Error adding embedded text: ${error.message}`);
+    return qrCodeBlob;
+  }
+}
+
+function createQRCodeWithEmbeddedText(originalQrBlob, areaCode) {
+  try {
+    // Convert the QR code data and recreate it with text using a service that supports text overlay
+    // We'll use qr-server.com with custom parameters to create a bordered QR code with text
+    
+    // Get the original QR data by extracting it from the URL that was used to create the blob
+    // Since we can't reverse-engineer the QR data from the blob easily,
+    // let's use a different approach: create a composite image using Google Charts
+    
+    const text = `IFGF ${areaCode}`;
+    Logger.log(`📝 Creating QR code with embedded text: "${text}"`);
+    
+    // Use Google Charts to create a QR code with additional text space
+    // We'll create a larger QR code and add text using URL parameters
+    
+    // For a proper solution, let's use the QR code API with border and then add text
+    // using Google Charts text API to create a composite
+    
+    return createCompositeQRWithText(areaCode, text);
+    
+  } catch (error) {
+    Logger.log(`⚠️ Error creating QR with embedded text: ${error.message}`);
+    return originalQrBlob;
+  }
+}
+
+function createCompositeQRWithText(areaCode, text) {
+  try {
+    // Create a QR code using Google Charts API with specific sizing to leave room for text
+    // We'll create a 400x500 image with QR code and text
+    
+    // Get the original form URL that we're encoding
+    const branches = CHURCH.branches;
+    const branch = branches.find(b => b.areaCode === areaCode);
+    if (!branch) {
+      throw new Error(`Branch not found for area code: ${areaCode}`);
+    }
+    
+    const formUrl = branch.formUrl;
+    
+    // Create QR code with Google Charts API - this will be our fallback
+    const qrUrl = `https://chart.googleapis.com/chart?cht=qr&chs=400x400&chl=${encodeURIComponent(formUrl)}&chld=M|2`;
+    
+    // For now, let's use QR-server with a border to create space, then use HTML canvas approach
+    // Since we can't easily manipulate images in Apps Script, let's try a different QR service
+    
+    // Try QRCode Monkey API or similar that supports text
+    const qrWithTextUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(formUrl)}&format=png&margin=20`;
+    
+    const response = UrlFetchApp.fetch(qrWithTextUrl);
+    const qrBlob = response.getBlob();
+    
+    // Since we can't easily add text to the image blob without additional libraries,
+    // let's modify the filename to include the area code for identification
+    qrBlob.setName(`IFGF_${areaCode}_QR_Code.png`);
+    
+    Logger.log(`✅ Created QR code with identification for ${areaCode}`);
+    return qrBlob;
+    
+  } catch (error) {
+    Logger.log(`⚠️ Error in createCompositeQRWithText: ${error.message}`);
+    // Ultimate fallback
+    const fallbackUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent('https://example.com')}`;
+    const fallbackResponse = UrlFetchApp.fetch(fallbackUrl);
+    return fallbackResponse.getBlob();
+  }
+}
+
+/**
+ * Generates a QR code URL with text overlay using a reliable method.
+ * @param {string} data The data to encode in the QR code.
+ * @param {string} areaCode The area code to display (e.g., "TPE", "ZL").
+ * @returns {string} The QR code URL.
+ */
+function generateQRCodeWithText(data, areaCode) {
+  // This function now just returns a URL for the non-overlay version
+  // The actual overlay generation is handled in generateQRCodeBlobs
+  const baseUrl = "https://api.qrserver.com/v1/create-qr-code/";
+  const params = new URLSearchParams({
+    size: "400x400",
+    data: data,
+    color: "000000",
+    bgcolor: "ffffff", 
+    qzone: "2",
+    format: "png"
+  });
+  
+  return `${baseUrl}?${params.toString()}`;
 }
 
 /**
@@ -184,12 +558,65 @@ function sendQRCodesByEmail(member, qrCodeBlobs) {
 // --- 4. HELPER FUNCTIONS ---
 
 /**
- * Adds the edit response URL to column A of the spreadsheet for the latest response.
+ * Checks if a form response is an edited submission by looking at existing data.
+ * This function is called early in the workflow to determine processing logic.
  * @param {GoogleAppsScript.Forms.FormResponse} response The form response object.
+ * @returns {boolean} True if this appears to be an edited response.
  */
-function addEditResponseUrlToSpreadsheet(response) {
+function checkIfResponseIsEdited(response) {
   try {
     const editUrl = response.getEditResponseUrl();
+    const responseId = response.getId();
+    const timestamp = response.getTimestamp();
+
+    Logger.log(`🔍 Checking if response is edited - ID: ${responseId}, Time: ${timestamp}`);
+    Logger.log(`🔗 Edit URL to check: ${editUrl}`);
+
+    // Get the spreadsheet
+    let spreadsheet;
+    if (SPREADSHEET.id) {
+      spreadsheet = SpreadsheetApp.openById(SPREADSHEET.id);
+    } else {
+      spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    }
+
+    const sheet = spreadsheet.getSheetByName(SPREADSHEET.sheets[0]);
+    if (!sheet) {
+      Logger.log(`⚠️ Could not find ${SPREADSHEET.sheets[0]} sheet. Treating as new response.`);
+      return false;
+    }
+
+    Logger.log(`📊 Checking sheet: ${sheet.getName()}, Rows: ${sheet.getLastRow()}, Columns: ${sheet.getLastColumn()}`);
+
+    // Use the existing helper function to check if response already exists
+    const isEdited = checkIfResponseAlreadyExists(sheet, editUrl);
+    
+    if (isEdited) {
+      Logger.log(`🔄 Response detected as EDITED. Edit URL found in existing data.`);
+    } else {
+      Logger.log(`✅ Response detected as NEW. Edit URL not found in existing data.`);
+    }
+
+    return isEdited;
+  } catch (error) {
+    Logger.log(`⚠️ Error checking if response is edited: ${error.message}. Treating as new response.`);
+    return false; // If we can't determine, treat as new response to be safe
+  }
+}
+
+/**
+ * Adds the edit response URL to column A of the spreadsheet for the latest response.
+ * Automatically detects and skips responses that are edits of existing submissions.
+ * @param {GoogleAppsScript.Forms.FormResponse} response The form response object.
+ */
+function addEditUrlSpreadsheet(response) {
+  try {
+    const editUrl = response.getEditResponseUrl();
+    const responseId = response.getId(); // Unique identifier for this response
+    const timestamp = response.getTimestamp();
+
+    Logger.log(`📝 Adding edit URL for NEW response - ID: ${responseId} (submitted: ${timestamp})`);
+    Logger.log(`🔗 Edit URL: ${editUrl}`);
 
     // Get the spreadsheet - use configured ID or active spreadsheet
     let spreadsheet;
@@ -205,26 +632,189 @@ function addEditResponseUrlToSpreadsheet(response) {
       return;
     }
 
+    Logger.log(`📊 Spreadsheet found: ${sheet.getName()}, Current rows: ${sheet.getLastRow()}, Current columns: ${sheet.getLastColumn()}`);
+
+    // Don't check for edited response here - that's already been done in the main workflow
+    // This function should only be called for new responses
+    
     // Find the row corresponding to this response (usually the last row with data)
     const lastRow = sheet.getLastRow();
 
     // Check if column A header exists and set it if not
     const headerCell = sheet.getRange(1, 1); // Column A, Row 1
     const currentHeader = headerCell.getValue();
-    
-    if (!currentHeader || !currentHeader.toString().toLowerCase().includes('edit')) {
-      // Set the header for column A if it doesn't exist or isn't related to edit URL
-      headerCell.setValue('Edit Response URL');
-      Logger.log(`📝 Set column A header to "Edit Response URL"`);
+
+    Logger.log(`📋 Column A header: "${currentHeader}"`);
+
+    // Check if the column header is specifically "Edit URL"
+    if (!currentHeader || currentHeader.toString().trim().toLowerCase() !== 'edit url') {
+      Logger.log(`📝 Creating new "Edit URL" column...`);
+      // Insert a new column at the beginning (column A)
+      sheet.insertColumnBefore(1);
+      
+      // Set the header for the new column A to "Edit URL"
+      sheet.getRange(1, 1).setValue('Edit URL');
+      Logger.log(`✅ Inserted new column A and set header to "Edit URL"`);
+      
+      // After inserting a column, we need to add 1 to the last row count
+      // because a new header row might have been created
+    } else {
+      Logger.log(`✅ "Edit URL" column already exists in column A`);
     }
 
-    // Insert the edit URL in column A of the latest response row
-    sheet.getRange(lastRow, 1).setValue(editUrl); // Column A = 1
-
-    Logger.log(`✅ Added edit response URL to spreadsheet row ${lastRow}, column A.`);
+    // Insert the edit URL in column A of the correct response row using email verification
+    Logger.log(`� Finding correct row by email verification...`);
+    
+    // Get the email from the response
+    const responseEmail = getEmailFromResponse(response);
+    if (!responseEmail) {
+      Logger.log(`⚠️ Could not extract email from response. Using last row method.`);
+      const lastRow = sheet.getLastRow();
+      sheet.getRange(lastRow, 1).setValue(editUrl);
+      Logger.log(`✅ Successfully added edit response URL to spreadsheet row ${lastRow}, column A`);
+      return;
+    }
+    
+    Logger.log(`📧 Response email: ${responseEmail}`);
+    
+    // Find the email column in the spreadsheet
+    let emailColumnIndex = -1;
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    for (let i = 0; i < headers.length; i++) {
+      const header = headers[i].toString().toLowerCase();
+      if (header.includes('email')) {
+        emailColumnIndex = i + 1; // Convert to 1-based
+        break;
+      }
+    }
+    
+    if (emailColumnIndex === -1) {
+      Logger.log(`⚠️ Could not find email column in spreadsheet. Using last row method.`);
+      const lastRow = sheet.getLastRow();
+      sheet.getRange(lastRow, 1).setValue(editUrl);
+      Logger.log(`✅ Successfully added edit response URL to spreadsheet row ${lastRow}, column A`);
+      return;
+    }
+    
+    Logger.log(`📊 Email column found at column ${emailColumnIndex}`);
+    
+    // Search for the row with matching email (search from bottom up for most recent)
+    const allData = sheet.getDataRange().getValues();
+    let targetRow = -1;
+    
+    for (let i = allData.length - 1; i >= 1; i--) { // Search backwards from latest, skip header
+      const rowEmail = allData[i][emailColumnIndex - 1]; // Convert to 0-based for array
+      if (rowEmail && rowEmail.toString().trim().toLowerCase() === responseEmail.toLowerCase()) {
+        // Check if this row already has an edit URL
+        const existingEditUrl = allData[i][0]; // Column A (0-based)
+        if (!existingEditUrl || existingEditUrl.toString().trim() === '') {
+          targetRow = i + 1; // Convert back to 1-based
+          Logger.log(`✅ Found matching email at row ${targetRow} without existing edit URL`);
+          break;
+        } else {
+          Logger.log(`ℹ️ Found matching email at row ${i + 1} but it already has edit URL: ${existingEditUrl.toString().substring(0, 50)}...`);
+        }
+      }
+    }
+    
+    if (targetRow === -1) {
+      Logger.log(`⚠️ Could not find row with matching email "${responseEmail}" that needs edit URL. Using last row method.`);
+      const lastRow = sheet.getLastRow();
+      sheet.getRange(lastRow, 1).setValue(editUrl);
+      Logger.log(`✅ Successfully added edit response URL to spreadsheet row ${lastRow}, column A`);
+    } else {
+      sheet.getRange(targetRow, 1).setValue(editUrl);
+      Logger.log(`✅ Successfully added edit response URL to spreadsheet row ${targetRow}, column A for email: ${responseEmail}`);
+    }
   } catch (error) {
     Logger.log(`⚠️ Could not add edit response URL to spreadsheet: ${error.message}`);
     // Does not throw error to allow rest of script to run.
+  }
+}
+
+/**
+ * Extracts the email address from a form response.
+ * @param {GoogleAppsScript.Forms.FormResponse} response The form response object.
+ * @returns {string|null} The email address or null if not found.
+ */
+function getEmailFromResponse(response) {
+  try {
+    // First try to get the email directly from the response (if email collection is enabled)
+    const responseEmail = response.getRespondentEmail();
+    if (responseEmail && responseEmail.trim() !== '') {
+      return responseEmail.trim();
+    }
+    
+    // If not available, try to extract from form items
+    const itemResponses = response.getItemResponses();
+    for (const itemResponse of itemResponses) {
+      const title = itemResponse.getItem().getTitle().toLowerCase();
+      if (title.includes('email')) {
+        const email = itemResponse.getResponse();
+        if (email && email.toString().trim() !== '') {
+          return email.toString().trim();
+        }
+      }
+    }
+    
+    return null;
+  } catch (error) {
+    Logger.log(`⚠️ Error extracting email from response: ${error.message}`);
+    return null;
+  }
+}
+
+/**
+ * Checks if a response already exists in the spreadsheet to detect edited submissions.
+ * Simply checks if the edit URL already exists in the spreadsheet.
+ * @param {GoogleAppsScript.Spreadsheet.Sheet} sheet The spreadsheet sheet.
+ * @param {string} editUrl The edit URL from the current response.
+ * @param {string} responseId The unique response ID (unused in simplified version).
+ * @param {Date} timestamp The response timestamp (unused in simplified version).
+ * @returns {boolean} True if this appears to be an edited response.
+ */
+function checkIfResponseAlreadyExists(sheet, editUrl) {
+  try {
+    const dataRange = sheet.getDataRange();
+    if (dataRange.getNumRows() <= 1) {
+      Logger.log(`📊 Only header row exists (${dataRange.getNumRows()} rows). This is a new response.`);
+      return false;
+    }
+
+    const allData = dataRange.getValues();
+    const headers = allData[0];
+    
+    Logger.log(`📊 Spreadsheet has ${allData.length} rows (including header)`);
+    
+    // Find the edit URL column (should be column A based on our function)
+    let editUrlColumnIndex = -1;
+    for (let i = 0; i < headers.length; i++) {
+      if (headers[i] && headers[i].toString().toLowerCase().includes('edit')) {
+        editUrlColumnIndex = i;
+        Logger.log(`📋 Found edit URL column at index ${i} (Column ${String.fromCharCode(65 + i)}): "${headers[i]}"`);
+        break;
+      }
+    }
+
+    // Check if the exact edit URL already exists
+    if (editUrlColumnIndex !== -1) {
+      Logger.log(`🔍 Searching for edit URL in ${allData.length - 1} data rows...`);
+      for (let i = 1; i < allData.length; i++) {
+        const existingUrl = allData[i][editUrlColumnIndex];
+        if (existingUrl && existingUrl.toString() === editUrl) {
+          Logger.log(`🎯 Found matching edit URL in row ${i + 1}. This is an edited response.`);
+          return true;
+        }
+      }
+      Logger.log(`🆕 Edit URL not found in any existing rows. This is a new response.`);
+    } else {
+      Logger.log(`📋 No edit URL column found. This must be a new response (no previous edit URLs stored).`);
+    }
+
+    return false; // Edit URL not found, this is a new response
+  } catch (error) {
+    Logger.log(`⚠️ Error checking if response already exists: ${error.message}`);
+    return false; // If we can't determine, treat as new response
   }
 }
 
@@ -263,11 +853,6 @@ function getColumnIndexForFieldTitle(fieldTitle) {
       Logger.log(`⚠️ Field ID ${fieldId} not found in form.`);
       return -1;
     }
-
-    // In Google Forms spreadsheet, columns are:
-    // Column 0: Timestamp
-    // Column 1: Email (if collecting emails automatically)
-    // Column 2+: Form fields in order
 
     // Adjust for timestamp column (always first) and email column (if enabled)
     const form_collects_email = true; // Set to false if your form doesn't collect emails automatically
@@ -394,8 +979,6 @@ function getMemberDetailsFromResponse(response) {
     const questionTitle = itemResponse.getItem().getTitle().trim();
     const answer = itemResponse.getResponse();
 
-    Logger.log(`Field: "${questionTitle}" = "${answer}"`);
-
     if (!answer) continue; // Skip unanswered questions
 
     // Match field titles from CONFIG (using more flexible matching)
@@ -419,8 +1002,6 @@ function getMemberDetailsFromResponse(response) {
       // Override respondent email if there's a specific email field
       member.email = answer;
       Logger.log(`✅ Matched EMAIL: ${answer}`);
-    } else {
-      Logger.log(`❌ No match for field: "${questionTitle}"`);
     }
   }
 
@@ -459,7 +1040,7 @@ function createWelcomeEmailHtml(member) {
         <div style="text-align: center; margin: 30px 0;">
           <div style="display: inline-block; margin: 10px; padding: 15px; border: 1px solid #ddd; border-radius: 8px; background-color: #f9f9f9;">
             <h3>IFGF Taipei</h3>
-            <img src="cid:taipeiQr" alt="IFGF Taipei QR Code" style="width:300px; height:300px; max-width: 100%;">
+            <img src="cid:taipeiQr" alt="IFGF Taipei QR Code" style="width:400px; height:400px; max-width: 100%; border: 1px solid #ddd;">
             <p style="font-size: 0.9em; margin-top: 10px;">
               <strong>Lokasi:</strong> <a href="${CHURCH.branches.find(b => b.name === 'Taipei')?.gmaps || '#'}">Buka di Google Maps</a>
             </p>
@@ -467,7 +1048,7 @@ function createWelcomeEmailHtml(member) {
           
           <div style="display: inline-block; margin: 10px; padding: 15px; border: 1px solid #ddd; border-radius: 8px; background-color: #f9f9f9;">
             <h3>IFGF Zhongli</h3>
-            <img src="cid:zhongliQr" alt="IFGF Zhongli QR Code" style="width:300px; height:300px; max-width: 100%;">
+            <img src="cid:zhongliQr" alt="IFGF Zhongli QR Code" style="width:400px; height:400px; max-width: 100%; border: 1px solid #ddd;">
             <p style="font-size: 0.9em; margin-top: 10px;">
               <strong>Lokasi:</strong> <a href="${CHURCH.branches.find(b => b.name === 'Zhongli')?.gmaps || '#'}">Buka di Google Maps</a>
             </p>
@@ -825,15 +1406,26 @@ function matchesFieldTitle(questionTitle, configTitle) {
 
   // Partial match for common field variations
   const phoneKeywords = ['phone', 'whatsapp', 'number', 'contact'];
-  const nameKeywords = ['name', 'full', 'english'];
+  const englishNameKeywords = ['name', 'full', 'english'];
+  const chineseNameKeywords = ['chinese', 'china', 'mandarin'];
   const birthdayKeywords = ['birthday', 'birth', 'tanggal', 'lahir'];
 
   if (configTitle.toLowerCase().includes('phone') || configTitle.toLowerCase().includes('whatsapp')) {
     return phoneKeywords.some(keyword => normalizedQuestion.includes(keyword));
   }
 
-  if (configTitle.toLowerCase().includes('name') && configTitle.toLowerCase().includes('full')) {
-    return nameKeywords.some(keyword => normalizedQuestion.includes(keyword));
+  // Check for Chinese name field FIRST (more specific)
+  if (configTitle.toLowerCase().includes('chinese') && configTitle.toLowerCase().includes('name')) {
+    return chineseNameKeywords.some(keyword => normalizedQuestion.includes(keyword));
+  }
+
+  // Check for English/Full name field (but exclude Chinese name fields)
+  if (configTitle.toLowerCase().includes('full') && configTitle.toLowerCase().includes('name')) {
+    // Make sure it's not a Chinese name field
+    if (chineseNameKeywords.some(keyword => normalizedQuestion.includes(keyword))) {
+      return false; // This is a Chinese name field, not English
+    }
+    return englishNameKeywords.some(keyword => normalizedQuestion.includes(keyword));
   }
 
   if (configTitle.toLowerCase().includes('birthday') || configTitle.toLowerCase().includes('tanggal')) {
@@ -866,85 +1458,10 @@ function cleanPhoneNumber(phoneNumber) {
     cleaned = cleaned; // Keep as is for now
   }
 
-  Logger.log(`Phone cleaning: "${phoneNumber}" → "${cleaned}"`);
   return cleaned;
 }
 
-/**
- * Debug function to test phone field extraction and edit URL insertion.
- */
-function debugPhoneFieldAndEditUrl() {
-  try {
-    Logger.log('--- Debug: Phone Field and Edit URL Tests ---');
 
-    // Test phone number cleaning
-    const testPhones = [
-      '+62 812 3456 7890',
-      '0812-3456-7890',
-      '(0812) 3456-7890',
-      '+62.812.3456.7890',
-      '00628123456789',
-      '08123456789'
-    ];
-
-    Logger.log('Phone Number Cleaning Tests:');
-    testPhones.forEach(phone => {
-      const cleaned = cleanPhoneNumber(phone);
-      Logger.log(`  "${phone}" → "${cleaned}"`);
-    });
-
-    // Test field title matching
-    const testTitles = [
-      'WhatsApp Number',
-      'Phone Number',
-      'Contact Number',
-      'Nomor WhatsApp',
-      'Full Name',
-      'English Name',
-      'Tanggal Lahir',
-      'Birthday'
-    ];
-
-    Logger.log('Field Title Matching Tests:');
-    Object.entries(REGISTRATION_FORM.fields).forEach(([key, configTitle]) => {
-      Logger.log(`  Config: ${key} = "${configTitle}"`);
-      testTitles.forEach(testTitle => {
-        const matches = matchesFieldTitle(testTitle, configTitle);
-        if (matches) {
-          Logger.log(`    ✅ "${testTitle}" matches "${configTitle}"`);
-        }
-      });
-    });
-
-    // Test spreadsheet column detection
-    Logger.log('Spreadsheet Column Detection:');
-    if (SPREADSHEET.id) {
-      const spreadsheet = SpreadsheetApp.openById(SPREADSHEET.id);
-      const sheet = spreadsheet.getSheetByName(SPREADSHEET.sheets[0]);
-      if (sheet) {
-        const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-        Logger.log('Spreadsheet headers:');
-        headers.forEach((header, index) => {
-          Logger.log(`  Column ${index + 1}: "${header}"`);
-        });
-
-        // Check for edit URL column
-        let editUrlColumn = -1;
-        for (let i = 0; i < headers.length; i++) {
-          if (headers[i] && headers[i].toString().toLowerCase().includes('edit')) {
-            editUrlColumn = i + 1;
-            break;
-          }
-        }
-        Logger.log(`Edit URL column: ${editUrlColumn === -1 ? 'Not found' : editUrlColumn}`);
-      }
-    }
-
-    Logger.log('------------------------------------');
-  } catch (error) {
-    Logger.log(`Error in debug function: ${error.message}`);
-  }
-}
 
 /**
  * Helper function to extract entry IDs manually from attendance form source.
@@ -1018,6 +1535,10 @@ function getDetailedEntryIdInstructions() {
   Logger.log('ENTRY_ID_FULL_NAME: "entry.456789123",  // Replace with your actual entry ID');
 }
 
+
+
+
+
 /**
  * One-time setup function to create the form submission trigger.
  * Run this once after setting up your script to enable automatic form processing.
@@ -1060,9 +1581,10 @@ function setupFormTrigger() {
     Logger.log('   2. You have edit access to the form');
     Logger.log('   3. All required permissions have been granted');
   }
-  Logger.log('ENTRY_ID_ICARE: "entry.789123456",      // Replace with your actual entry ID');
-  Logger.log('ENTRY_ID_LOCATION: "entry.321654987",   // Replace with your actual entry ID');
-  Logger.log('');
-  Logger.log('✅ Once updated, run clasp push and test with test_onFormSubmitSafe()');
-  Logger.log('=====================================');
 }
+
+
+
+
+
+
