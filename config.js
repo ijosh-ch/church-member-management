@@ -48,5 +48,12 @@ const CALENDAR = {
 
 const SPREADSHEET = {
   id: '1M0ARrzedTrfMRsqlPsyIxMtv0Plt1_9cG__tzOVuy0w',
-  sheets: ['Daftar Jemaat']
+  sheets:{
+    DAFTAR_JEMAAT: 'Daftar Jemaat',
+    DAFTAR_ABSENSI: 'Daftar Absensi',
+    ABSEN: [
+      'Absen - Taipei',
+      'Absen - Zhongli'
+    ]
+  }
 }
