@@ -33,22 +33,46 @@ function addWeeklyAttendanceColumns() {
         Logger.log(`➕ Inserting 2 new blank columns at position E in '${sheetName}'...`);
         sheet.insertColumnsAfter(4, 2); // Insert 2 columns after column D (position 4)
         
-        // Step 2: Copy content from G-H back to E-F
-        // After insertion, the previous E-F data is now in G-H
-        const lastRow = sheet.getLastRow();
-        if (lastRow > 0) {
-          Logger.log(`📋 Copying content from G-H to E-F in '${sheetName}'...`);
+        // Step 2: Merge cells E6:F6
+        Logger.log(`🔗 Merging cells E6:F6 in '${sheetName}'...`);
+        try {
+          // First check if the range is already merged
+          const mergeRange = sheet.getRange(6, 5, 1, 2); // Row 6, Column E-F (5-6), 1 row, 2 columns
           
-          // Get data from columns G and H (positions 7 and 8)
-          const dataG = sheet.getRange(1, 7, lastRow, 1).getValues();
-          const dataH = sheet.getRange(1, 8, lastRow, 1).getValues();
+          // Unmerge first in case it's already merged
+          try {
+            sheet.getRange('E6:F6').breakApart();
+          } catch (e) {
+            // Range might not be merged, continue
+          }
           
-          // Copy to the new columns E and F (positions 5 and 6)
-          sheet.getRange(1, 5, lastRow, 1).setValues(dataG);
-          sheet.getRange(1, 6, lastRow, 1).setValues(dataH);
-          
-          Logger.log(`✅ Copied content from G-H to E-F`);
+          // Now merge the range
+          mergeRange.mergeAcross();
+          Logger.log(`✅ Successfully merged cells E6:F6`);
+        } catch (mergeError) {
+          Logger.log(`⚠️ Could not merge E6:F6: ${mergeError.message}`);
         }
+        
+        // Step 3: Copy content from G-H to E-F (including formulas)
+        // After insertion, the previous E-F data is now in G-H
+        Logger.log(`📋 Copying content from G-H to E-F in '${sheetName}' (including formulas)...`);
+        
+        const maxRows = sheet.getMaxRows(); // Use maxRows for a full column copy
+        Logger.log(`📊 Copying full columns (up to ${maxRows} rows) to ensure all formulas are included.`);
+
+        // Get source ranges from columns G and H
+        const sourceG = sheet.getRange(1, 7, maxRows, 1);
+        const sourceH = sheet.getRange(1, 8, maxRows, 1);
+
+        // Get target ranges in columns E and F
+        const targetE = sheet.getRange(1, 5, maxRows, 1);
+        const targetF = sheet.getRange(1, 6, maxRows, 1);
+
+        // Copy formulas, formatting, and values
+        sourceG.copyTo(targetE, SpreadsheetApp.CopyPasteType.PASTE_NORMAL, false);
+        sourceH.copyTo(targetF, SpreadsheetApp.CopyPasteType.PASTE_NORMAL, false);
+        
+        Logger.log(`✅ Copied formulas and formatting from G-H to E-F`);
         
         Logger.log(`✅ Successfully added weekly columns to '${sheetName}'`);
         
